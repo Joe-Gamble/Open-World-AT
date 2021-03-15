@@ -67,7 +67,6 @@ public class ChunkManager : MonoBehaviour
     //Logic to Load/Unlod the correct chunks on entering a new one
     public void EnterNewChunk(Chunk new_chunk)
     {
-        Debug.Log("Player has moved from Chunk " + current_chunk.chunk_ID + " to Chunk" + new_chunk.chunk_ID);
         List<int> needed_neighbours = new List<int>();
 
         foreach (int old_chunk_id in current_chunk.chunk_neighbours)
@@ -105,17 +104,39 @@ public class ChunkManager : MonoBehaviour
 
             GameObject go;
 
+            //Unity Primitive
             if (obj.is_unity_primitive)
             {
                 go = GameObject.CreatePrimitive(obj.primitive_type);
-                go.GetComponent<MeshRenderer>().sharedMaterial = obj.obj_mats[0];
+
+                if (obj.obj_mats != null)
+                {
+                    List<Material> mats = new List<Material>();
+
+                    foreach (string mat_name in obj.obj_mats)
+                    {
+                        mats.Add(Resources.Load("World Data/Materials/" + mat_name, typeof(Material)) as Material);
+                    }
+
+                    go.GetComponent<MeshRenderer>().sharedMaterials = mats.ToArray();
+                }
             }
+            //Non Unity Object
             else
             {
                 go = new GameObject();
 
-                go.AddComponent<MeshFilter>().sharedMesh = Resources.Load<Mesh>("World Data/Meshes/" + obj.obj_mesh.name);
-                go.AddComponent<MeshRenderer>().sharedMaterials = obj.obj_mats;
+                go.AddComponent<MeshFilter>().sharedMesh = Resources.Load<Mesh>("World Data/Meshes/" + obj.obj_mesh);
+                go.AddComponent<MeshRenderer>();
+
+                List<Material> mats = new List<Material>();
+
+                foreach (string mat_name in obj.obj_mats)
+                {
+                    mats.Add(Resources.Load("World Data/Materials/" + mat_name, typeof(Material)) as Material);
+                }
+
+                go.GetComponent<MeshRenderer>().sharedMaterials = mats.ToArray();
             }
 
             go.name = obj.name;
@@ -145,7 +166,6 @@ public class ChunkManager : MonoBehaviour
                         }
                     }
                 }
-
             }
         }
         chunks.Add(chunk);
@@ -154,12 +174,14 @@ public class ChunkManager : MonoBehaviour
     //Destroy a Chunk in the world
     public void UnloadChunk(Chunk chunk)
     {
-        foreach (Obj obj in chunk.objects)
+        if (chunk.objects.Count > 0)
         {
-            Destroy(obj.runtime_ref);
-            obj.runtime_ref = null;
+            foreach (Obj obj in chunk.objects)
+            {
+                Destroy(obj.runtime_ref);
+                obj.runtime_ref = null;
+            }
         }
-
         chunks.Remove(chunk);
     }
 
@@ -250,11 +272,11 @@ public class ChunkManager : MonoBehaviour
         //Materials
         if (go.obj_mats != null)
         {
-            foreach (Material mat in go.obj_mats)
+            foreach (string mat in go.obj_mats)
             {
-                if (Resources.Load("World Data/Materials/" + mat.name) == null)
+                if (Resources.Load("World Data/Materials/" + mat) == null)
                 {
-                    AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(mat), m_path + "Materials/" + mat.name + ".mat");
+                    AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(Resources.Load("World Data/Materials/" + mat)), m_path + "Materials/" + mat + ".mat");
                 }
             }
         }
@@ -262,15 +284,16 @@ public class ChunkManager : MonoBehaviour
         //Meshes
         if (go.obj_mesh != null)
         {
-            if (Resources.Load("World Data/Meshes/" + go.obj_mesh.name) == null)
+            if (Resources.Load("World Data/Meshes/" + go.obj_mesh) == null)
             {
-                string status = AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(go.obj_mesh), m_path + "Meshes/" + go.obj_mesh.name + ".fbx");
+                string status = AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(Resources.Load("World Data/Meshes/" + go.obj_mesh)), m_path + "Meshes/" + go.obj_mesh + ".fbx");
 
-                if (status != null)
+                if (status != "")
                 {
+                    // print(status);
                     go.is_unity_primitive = true;
 
-                    switch (go.obj_mesh.name)
+                    switch (go.obj_mesh)
                     {
                         case "Cube":
                             {
@@ -330,6 +353,24 @@ public class ChunkManager : MonoBehaviour
 
     }
 
+    public void RespawnObjectsFromJson()
+    {
+        string[] dir = Directory.GetDirectories(Application.dataPath + "/Resources/World Data/Chunks");
+
+        if (!Directory.EnumerateFileSystemEntries(dir[0]).Any())
+        {
+            return;
+        }
+
+        foreach (string s in dir)
+        {
+            string path = File.ReadAllText(s + "/Chunk Data.json");
+            Chunk chunk = new Chunk();
+            chunk = JsonUtility.FromJson<Chunk>(path);
+
+            LoadChunk(chunk);
+        }
+    }
     #endregion
 
     #region inactive code
@@ -493,8 +534,15 @@ public class ChunkManager : MonoBehaviour
         {
             Debug.Log("Adding material/mesh");
             Material[] mats = go.GetComponent<MeshRenderer>().sharedMaterials;
-            obj.obj_mats = mats;
-            obj.obj_mesh = go.GetComponent<MeshFilter>().sharedMesh;
+
+            obj.obj_mats = new List<string>();
+
+            foreach (Material mat in mats)
+            {
+                obj.obj_mats.Add(mat.name);
+            }
+
+            obj.obj_mesh = go.GetComponent<MeshFilter>().sharedMesh.name;
         }
 
         Transform trans = go.GetComponent<Transform>();
@@ -596,16 +644,14 @@ public class ChunkManagerEditor : EditorWindow
     {
         chunkManagerGO = (GameObject)EditorGUILayout.ObjectField("GameManager", chunkManagerGO, typeof(GameObject), true);
 
-        if (GUILayout.Button("Generate Object List"))
-        {
-            chunkManager.FindWorldObjects();
-        }
-
         if (GUILayout.Button("Generate Chunks"))
         {
             chunkManager = chunkManagerGO.GetComponent<ChunkManager>();
 
             chunkManager.UpdateDirectories();
+
+            chunkManager.FindWorldObjects();
+
             if (chunkManager.HasChunks())
             {
                 chunkManager.RemoveChunks();
@@ -617,6 +663,7 @@ public class ChunkManagerEditor : EditorWindow
         {
             if (GUILayout.Button("Delete Chunks"))
             {
+                //chunkManager.RespawnObjectsFromJson();
                 chunkManager.UpdateDirectories();
                 chunkManager.RemoveChunks();
             }

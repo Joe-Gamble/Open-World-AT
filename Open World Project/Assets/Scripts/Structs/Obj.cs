@@ -20,7 +20,8 @@ public class Obj
     public bool is_unity_primitive = false;
     public PrimitiveType primitive_type;
 
-    public Mesh obj_mesh;
-    public Material[] obj_mats;
+    public string obj_mesh;
+    public List<string> obj_mats;
+
     public Collider obj_col;
 }

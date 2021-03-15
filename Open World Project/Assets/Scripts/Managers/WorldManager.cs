@@ -58,15 +58,16 @@ public class WorldManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-
-        foreach (int neighbour in chunkManager.GetCurrentChunk().chunk_neighbours)
+        if (!chunkManager.GetCurrentChunk().chunk_bounds.Contains(player.transform.position))
         {
-            if (chunkManager.GetChunk(neighbour).chunk_bounds.Contains(player.transform.position))
+            foreach (int neighbour in chunkManager.GetCurrentChunk().chunk_neighbours)
             {
-                chunkManager.EnterNewChunk(chunkManager.GetChunk(neighbour));
-                break;
+                if (chunkManager.GetChunk(neighbour).chunk_bounds.Contains(player.transform.position))
+                {
+                    chunkManager.EnterNewChunk(chunkManager.GetChunk(neighbour));
+                    break;
+                }
             }
         }
-
     }
 }
