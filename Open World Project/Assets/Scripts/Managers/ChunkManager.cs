@@ -7,12 +7,9 @@ using System.IO;
 
 //To do tomorrow
 /*
-
--- player movement and chunk logic
 -- Day/Night Cycle
 -- Weather
 --More chunk functionality to save objects/chunks?
-
 */
 
 [ExecuteInEditMode]
@@ -174,6 +171,7 @@ public class ChunkManager : MonoBehaviour
     //Destroy a Chunk in the world
     public void UnloadChunk(Chunk chunk)
     {
+        //NEEDS RESAVING?
         if (chunk.objects.Count > 0)
         {
             foreach (Obj obj in chunk.objects)
@@ -238,7 +236,6 @@ public class ChunkManager : MonoBehaviour
             }
         }
         GenerateChunkNeighbours();
-        current_chunk = chunks[3];
     }
 
     public void RemoveChunks()
@@ -614,64 +611,4 @@ public class ChunkManager : MonoBehaviour
 
     }
     #endregion
-}
-
-[ExecuteInEditMode]
-public class ChunkManagerEditor : EditorWindow
-{
-    public ChunkManager chunkManager;
-    public GameObject chunkManagerGO;
-
-    private void OnEnable()
-    {
-        chunkManagerGO = GameObject.FindGameObjectWithTag("GameController");
-        chunkManager = chunkManagerGO.GetComponent<ChunkManager>();
-    }
-
-    [MenuItem("Window/ChunkEditor")]
-    public static void ShowWindow()
-    {
-        //Show existing window instance. If one doesn't exist, make one.
-        EditorWindow.GetWindow(typeof(ChunkManagerEditor));
-    }
-
-    void OnInspectorUpdate()
-    {
-        //Repaint();
-    }
-
-    public void OnGUI()
-    {
-        chunkManagerGO = (GameObject)EditorGUILayout.ObjectField("GameManager", chunkManagerGO, typeof(GameObject), true);
-
-        if (GUILayout.Button("Generate Chunks"))
-        {
-            chunkManager = chunkManagerGO.GetComponent<ChunkManager>();
-
-            chunkManager.UpdateDirectories();
-
-            chunkManager.FindWorldObjects();
-
-            if (chunkManager.HasChunks())
-            {
-                chunkManager.RemoveChunks();
-            }
-            chunkManager.MakeChunks();
-        }
-
-        if (chunkManager.HasChunks())
-        {
-            if (GUILayout.Button("Delete Chunks"))
-            {
-                //chunkManager.RespawnObjectsFromJson();
-                chunkManager.UpdateDirectories();
-                chunkManager.RemoveChunks();
-            }
-
-            if (GUILayout.Button("Collect World Data"))
-            {
-                chunkManager.CollectData();
-            }
-        }
-    }
 }
