@@ -7,14 +7,12 @@ using System;
 
 namespace World
 {
-    public enum TimeState
+    public enum Region
     {
-        Sunrise,
-        Morning,
-        Afternoon,
-        Dusk,
-        Evening,
-        Night
+        Grasslands,
+        Frozen_Peaks,
+        Dusty_Dunes,
+        Swamplands
     }
 
     public enum SeasonState
@@ -33,22 +31,23 @@ namespace World
     }
 }
 
-[Serializable]
-public struct WorldPresets
+public struct WorldData
 {
-    public List<LightingPreset> lighting_presets;
+    public ChunkData chunk_data;
+    public LightingPresets lighting_presets;
 }
 
 public class WorldManager : MonoBehaviour
 {
+    public WorldData data;
+
     private ChunkManager chunkManager;
     private LightingManager lighting_manager;
 
-    private World.SeasonState current_season;
-    private World.TimeState current_time;
+    [SerializeField, Range(0, 24)] private float time_of_day;
 
-    public WorldPresets data;
-    public int number_of_presets = 0;
+    private World.SeasonState current_season;
+    private World.Region current_region;
 
     private GameObject player;
 
@@ -59,80 +58,65 @@ public class WorldManager : MonoBehaviour
     {
         chunkManager = this.GetComponent<ChunkManager>();
         lighting_manager = this.GetComponent<LightingManager>();
-
         player = GameObject.FindGameObjectWithTag("Player");
+
         Initialise();
     }
 
     void Initialise()
     {
         chunkManager.InitialiseSpawnChunks(spawn_chunk);
+        lighting_manager.LoadLightingPresets();
+
+        ExtractFromScripts();
+
         player.transform.position = chunkManager.GetChunk(spawn_chunk).chunk_pos;
+    }
+
+    void ExtractFromScripts()
+    {
+        data.chunk_data = chunkManager.GetChunks();
+        data.lighting_presets = lighting_manager.GetPresets();
     }
 
     // Update is called once per frame
     void Update()
     {
-        if (!chunkManager.GetCurrentChunk().chunk_bounds.Contains(player.transform.position))
+        ExtractFromScripts();
+
+        #region Lighting
+
+        if (Application.isPlaying)
         {
-            foreach (int neighbour in chunkManager.GetCurrentChunk().chunk_neighbours)
+            time_of_day += Time.deltaTime / 10;
+            time_of_day %= 24;
+            lighting_manager.UpdateLighting(time_of_day / 24f);
+        }
+        else
+        {
+            lighting_manager.UpdateLighting(time_of_day / 24f);
+        }
+
+        #endregion
+
+        #region Chunks
+
+        Chunk current_chunk = data.chunk_data.current_chunk;
+        if (!current_chunk.chunk_bounds.Contains(player.transform.position))
+        {
+            foreach (int neighbour in current_chunk.chunk_neighbours)
             {
                 if (chunkManager.GetChunk(neighbour).chunk_bounds.Contains(player.transform.position))
                 {
+                    Debug.Log(neighbour);
+
                     chunkManager.EnterNewChunk(chunkManager.GetChunk(neighbour));
                     break;
                 }
             }
         }
-    }
-    public WorldPresets GetPresets()
-    {
-        if (Resources.Load("World Data/World Presets") != null)
-        {
-            //string path = File.ReadAllText(Application.dataPath + "/Resources/World Data/World Presets.json");
-            //data = JsonUtility.FromJson<WorldPresets>(path);
-            return data;
-        }
-        else
-        {
-            return ResetPresets();
-        }
-    }
-    public WorldPresets ResetPresets()
-    {
-        data = new WorldPresets();
-        data.lighting_presets = new List<LightingPreset>();
 
-        for (int i = 0; i < number_of_presets; i++)
-        {
-            LightingPreset lp = new LightingPreset();
-
-            lp.ambient_color = new Gradient();
-            lp.directional_color = new Gradient();
-            lp.fog_color = new Gradient();
-
-            data.lighting_presets.Add(lp);
-        }
-        return data;
-    }
-
-    public void SavePresets()
-    {
-        if (Directory.Exists(Application.dataPath + "/Resources/World Data/"))
-        {
-            if (data.lighting_presets.Count > 0)
-            {
-                string json = JsonUtility.ToJson(data);
-                File.WriteAllText(Application.dataPath + "/Resources/World Data/World Presets.json", json);
-
-                AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh();
-
-                lighting_manager = this.GetComponent<LightingManager>();
-
-                lighting_manager.UpdateLightingPresets();
-            }
-        }
+        #endregion
     }
 }
 
@@ -144,11 +128,13 @@ public class WorldManagerEditor : EditorWindow
     Vector2 scroll_pos = Vector2.zero;
     public GameObject world_manager_instance;
 
+    private WorldManager world_manager;
     private ChunkManager chunk_manager;
     private LightingManager lighting_manager;
-    private WorldManager world_manager;
 
+    private WorldData data;
 
+    private LightingPresets presets;
 
     private void OnEnable()
     {
@@ -159,17 +145,28 @@ public class WorldManagerEditor : EditorWindow
     {
         if (world_manager_instance != null)
         {
-            chunk_manager = world_manager_instance.GetComponent<ChunkManager>();
-            lighting_manager = world_manager_instance.GetComponent<LightingManager>();
-            world_manager = world_manager_instance.GetComponent<WorldManager>();
+            if (world_manager == null)
+            {
+                world_manager = world_manager_instance.GetComponent<WorldManager>();
+                data = world_manager.data;
+            }
+            if (chunk_manager == null)
+            {
+                chunk_manager = world_manager_instance.GetComponent<ChunkManager>();
+            }
+            if (lighting_manager == null)
+            {
+                lighting_manager = world_manager_instance.GetComponent<LightingManager>();
+            }
         }
     }
 
-    [MenuItem("Window/ChunkEditor")]
+    [MenuItem("Window/WorldEditor")]
     public static void ShowWindow()
     {
         //Show existing window instance. If one doesn't exist, make one.
         EditorWindow.GetWindow(typeof(WorldManagerEditor));
+
     }
 
     void OnInspectorUpdate()
@@ -199,7 +196,7 @@ public class WorldManagerEditor : EditorWindow
             {
                 chunk_manager.RemoveChunks();
             }
-            chunk_manager.MakeChunks();
+            chunk_manager.MakeChunks(data.chunk_data);
         }
 
         if (chunk_manager.HasChunks())
@@ -219,31 +216,40 @@ public class WorldManagerEditor : EditorWindow
 
         #endregion
 
+        #region  Lighting Tools
+
         EditorGUILayout.LabelField("Lighting Settings", EditorStyles.boldLabel);
 
-        world_manager.number_of_presets = EditorGUILayout.IntField(world_manager.number_of_presets);
+        lighting_manager.number_of_presets = EditorGUILayout.IntField(lighting_manager.number_of_presets);
 
-        for (int i = 0; i < world_manager.GetPresets().lighting_presets.Count; i++)
+        for (int i = 0; i < presets.presets.Count; i++)
         {
-            LightingPreset lp = world_manager.GetPresets().lighting_presets[i];
+            LightingPreset lp = presets.presets[i];
 
-            lp.time_period = (World.TimeState)EditorGUILayout.EnumFlagsField("Time Period", lp.time_period);
+            lp.region = (World.Region)EditorGUILayout.EnumFlagsField("Region", lp.region);
             lp.ambient_color = EditorGUILayout.GradientField("Ambient Color", lp.ambient_color);
             lp.directional_color = EditorGUILayout.GradientField("Directional Color", lp.directional_color);
             lp.fog_color = EditorGUILayout.GradientField("Fog Color", lp.fog_color);
         }
 
-        if (GUILayout.Button("Push Colors to File"))
+        if (GUILayout.Button("Read Current Colors"))
         {
-            world_manager.SavePresets();
+            presets = lighting_manager.LoadPresets();
         }
 
         if (GUILayout.Button("Reset Colors"))
         {
-            world_manager.ResetPresets();
+            presets = lighting_manager.ResetPresets();
+        }
+
+        if (GUILayout.Button("Push Colors to File"))
+        {
+            lighting_manager.SavePresets(presets);
         }
 
         GUILayout.EndScrollView();
+
+        #endregion
     }
 }
 #endregion

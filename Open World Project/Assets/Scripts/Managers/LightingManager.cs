@@ -2,80 +2,103 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
-using System;
+using UnityEditor;
 
 [ExecuteInEditMode]
 public class LightingManager : MonoBehaviour
 {
+    LightingPresets lighting_presets;
 
     [SerializeField] private Light directional_light;
+    public int number_of_presets = 0;
 
-    public LightingPreset[] presets;
-    private LightingPreset current_preset;
+    #region Editor Functions
 
-    [SerializeField, Range(0, 24)] private float time_of_day;
-
-    private void Update()
+    public LightingPresets GetPresets()
     {
-        if (presets == null)
-        {
-            return;
-        }
+        return lighting_presets;
+    }
 
-        if (Application.isPlaying)
+    public LightingPresets LoadPresets()
+    {
+        if (Resources.Load("World Data/Lighting/Presets") != null)
         {
-            time_of_day += Time.deltaTime / 10;
-            time_of_day %= 24;
-            UpdateLighting((time_of_day / 24f));
+            string path = File.ReadAllText(Application.dataPath + "/Resources/World Data/Lighting/Presets.json");
+            return JsonUtility.FromJson<LightingPresets>(path);
         }
         else
         {
-            UpdateLighting(time_of_day / 24f);
-        }
-
-    }
-
-    public void UpdateLightingPresets()
-    {
-        Debug.Log("Happening");
-
-        if (Resources.Load("World Data/World Presets") != null)
-        {
-            string path = File.ReadAllText(Application.dataPath + "/Resources/World Data/World Presets.json");
-
-            presets = JsonUtility.FromJson<WorldPresets>(path).lighting_presets.ToArray();
-            current_preset = presets[0];
+            return ResetPresets();
         }
     }
-
-    private void UpdateLighting(float time_percent)
+    public LightingPresets ResetPresets()
     {
-        float splits = 24 / presets.Length;
-        //int i = 0;
+        lighting_presets = new LightingPresets();
+        lighting_presets.presets = new List<LightingPreset>();
 
-        current_preset = presets[0];
-        /*
-        foreach (LightingPreset lp in presets)
+        for (int i = 0; i < number_of_presets; i++)
         {
-            if (IsBetween(time_percent, splits * (float)presets[0].time_period, splits * (float)presets[i + 1].time_period))
+            LightingPreset lp = new LightingPreset();
+
+            lp.ambient_color = new Gradient();
+            lp.directional_color = new Gradient();
+            lp.fog_color = new Gradient();
+
+            lighting_presets.presets.Add(lp);
+        }
+        return lighting_presets;
+    }
+
+    public void SavePresets(LightingPresets lps)
+    {
+        lighting_presets = lps;
+
+        if (Directory.Exists(Application.dataPath + "/Resources/World Data/Lighting"))
+        {
+            if (lighting_presets.presets.Count > 0)
             {
-                current_preset = lp;
-            }
-            else
-            {
-                
+                string json = JsonUtility.ToJson(lighting_presets);
+                File.WriteAllText(Application.dataPath + "/Resources/World Data/Lighting/Presets.json", json);
+
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
             }
         }
-        */
-        RenderSettings.ambientLight = current_preset.ambient_color.Evaluate(time_percent);
-        RenderSettings.fogColor = current_preset.fog_color.Evaluate(time_percent);
+    }
+
+    #endregion
+
+    #region Runtime Fuctions
+
+    public void LoadLightingPresets()
+    {
+        if (Resources.Load("World Data/Lighting/Presets") != null)
+        {
+            lighting_presets = new LightingPresets();
+
+            string path = File.ReadAllText(Application.dataPath + "/Resources/World Data/Lighting/Presets.json");
+            lighting_presets = JsonUtility.FromJson<LightingPresets>(path);
+
+            if (lighting_presets.current_preset.ambient_color == null)
+            {
+                lighting_presets.current_preset = lighting_presets.presets[0];
+            }
+        }
+    }
+
+    public void UpdateLighting(float time_percent)
+    {
+        RenderSettings.ambientLight = lighting_presets.current_preset.ambient_color.Evaluate(time_percent);
+        RenderSettings.fogColor = lighting_presets.current_preset.fog_color.Evaluate(time_percent);
 
         if (directional_light != null)
         {
-            directional_light.color = current_preset.directional_color.Evaluate(time_percent);
+            directional_light.color = lighting_presets.current_preset.directional_color.Evaluate(time_percent);
             directional_light.transform.localRotation = Quaternion.Euler(new Vector3((time_percent * 360.0f) - 90f, -170, 0));
         }
     }
+
+    #endregion
 
     private void OnValidate()
     {

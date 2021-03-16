@@ -15,16 +15,12 @@ using System.IO;
 [ExecuteInEditMode]
 public class ChunkManager : MonoBehaviour
 {
+    ChunkData chunk_data;
+
     public GameObject testPlane;
 
     private float length;
     public int divides = 3;
-
-    private float chunk_size;
-
-    private List<Chunk> chunks;
-
-    private Chunk current_chunk;
 
     private List<GameObject> world_objects;
 
@@ -38,24 +34,23 @@ public class ChunkManager : MonoBehaviour
     //Create a Chunk from Json Data
     private Chunk GetChunkFromFile(int chunk_id)
     {
-        string path = Application.dataPath + "/Resources/World Data/Chunks/Chunk" + chunk_id + "/Chunk Data.json";
-
-        string path2 = File.ReadAllText(Application.dataPath + "/Resources/World Data/Chunks/Chunk" + chunk_id + "/Chunk Data.json");
+        string path = File.ReadAllText(Application.dataPath + "/Resources/World Data/Chunks/Chunk" + chunk_id + " Data.json");
 
         Chunk chunk = new Chunk();
-        chunk = JsonUtility.FromJson<Chunk>(path2);
+        chunk = JsonUtility.FromJson<Chunk>(path);
 
         return chunk;
     }
 
     public void InitialiseSpawnChunks(int chunk_id)
     {
-        chunks = new List<Chunk>();
+        chunk_data = new ChunkData();
+        chunk_data.chunks = new List<Chunk>();
 
         SetCurrentChunk(GetChunkFromFile(chunk_id));
-        LoadChunk(current_chunk);
+        LoadChunk(chunk_data.current_chunk);
 
-        foreach (int neighbor in current_chunk.chunk_neighbours)
+        foreach (int neighbor in chunk_data.current_chunk.chunk_neighbours)
         {
             LoadChunk(GetChunkFromFile(neighbor));
         }
@@ -66,7 +61,7 @@ public class ChunkManager : MonoBehaviour
     {
         List<int> needed_neighbours = new List<int>();
 
-        foreach (int old_chunk_id in current_chunk.chunk_neighbours)
+        foreach (int old_chunk_id in chunk_data.current_chunk.chunk_neighbours)
         {
             if (new_chunk.chunk_neighbours.Exists(x => x == old_chunk_id))
             {
@@ -74,7 +69,7 @@ public class ChunkManager : MonoBehaviour
             }
             else if (old_chunk_id == new_chunk.chunk_ID)
             {
-                needed_neighbours.Add(current_chunk.chunk_ID);
+                needed_neighbours.Add(chunk_data.current_chunk.chunk_ID);
             }
             else
             {
@@ -165,7 +160,7 @@ public class ChunkManager : MonoBehaviour
                 }
             }
         }
-        chunks.Add(chunk);
+        chunk_data.chunks.Add(chunk);
     }
 
     //Destroy a Chunk in the world
@@ -180,26 +175,32 @@ public class ChunkManager : MonoBehaviour
                 obj.runtime_ref = null;
             }
         }
-        chunks.Remove(chunk);
+        chunk_data.chunks.Remove(chunk);
     }
 
     #endregion
 
     #region Editor Functions
 
-    public void MakeChunks()
+    public void MakeChunks(ChunkData _chunk_data)
     {
+        chunk_data = _chunk_data;
+
         length = testPlane.GetComponent<Renderer>().bounds.size.x;
 
         int chunk_numbers = divides * divides;
         //how many steps
         float chunk_offset_steps = divides * 2;
         //how big are the steps
-        chunk_size = length / divides;
 
-        chunks = new List<Chunk>();
+        chunk_data = new ChunkData();
+        chunk_data.chunks = new List<Chunk>();
 
-        Vector3 pos = new Vector3(((0 - length / 2) + (chunk_size / 2)), testPlane.transform.position.y, ((0 - length / 2) + (chunk_size / 2)));
+        chunk_data.chunk_size = length / divides;
+
+        chunk_data.directory = "/Resources/World Data/Chunks/";
+
+        Vector3 pos = new Vector3(((0 - length / 2) + (chunk_data.chunk_size / 2)), testPlane.transform.position.y, ((0 - length / 2) + (chunk_data.chunk_size / 2)));
         float reset = pos.x;
 
         for (int i = 1; i <= chunk_numbers; i++)
@@ -210,7 +211,7 @@ public class ChunkManager : MonoBehaviour
 
             chunk.chunk_ID = i;
 
-            chunk.chunk_bounds = new Bounds(chunk.chunk_pos, new Vector3(chunk_size, chunk_size, chunk_size));
+            chunk.chunk_bounds = new Bounds(chunk.chunk_pos, new Vector3(chunk_data.chunk_size, chunk_data.chunk_size, chunk_data.chunk_size));
 
             chunk.objects = new List<Obj>();
 
@@ -218,21 +219,16 @@ public class ChunkManager : MonoBehaviour
 
             //Grab all Gameobjects for mesh extraction
 
-            string chunk_directory = "Chunk" + chunk.chunk_ID;
-            AssetDatabase.CreateFolder("Assets/Resources/World Data/Chunks", chunk_directory);
-
-            chunk.directory = "/Resources/World Data/Chunks/" + chunk_directory;
-
-            chunks.Add(chunk);
+            chunk_data.chunks.Add(chunk);
 
             if (i % divides == 0)
             {
-                pos.z += chunk_size;
+                pos.z += chunk_data.chunk_size;
                 pos.x = reset;
             }
             else
             {
-                pos.x += chunk_size;
+                pos.x += chunk_data.chunk_size;
             }
         }
         GenerateChunkNeighbours();
@@ -240,15 +236,15 @@ public class ChunkManager : MonoBehaviour
 
     public void RemoveChunks()
     {
-        chunks.Clear();
-        chunks = null;
+        chunk_data.chunks.Clear();
+        chunk_data.chunks = null;
     }
 
     public void CollectData()
     {
         for (int i = 0; i < world_objects.Count; i++)
         {
-            foreach (Chunk chunk in chunks)
+            foreach (Chunk chunk in chunk_data.chunks)
             {
                 if (chunk.chunk_bounds.Contains(world_objects[i].gameObject.transform.position))
                 {
@@ -336,12 +332,12 @@ public class ChunkManager : MonoBehaviour
 
     public void SaveChunkData()
     {
-        foreach (Chunk chunk in chunks)
+        foreach (Chunk chunk in chunk_data.chunks)
         {
-            if (Directory.Exists(Application.dataPath + chunk.directory))
+            if (Directory.Exists(Application.dataPath + chunk_data.directory))
             {
                 string json = JsonUtility.ToJson(chunk);
-                File.WriteAllText(Application.dataPath + chunk.directory + "/Chunk Data.json", json);
+                File.WriteAllText(Application.dataPath + chunk_data.directory + "/Chunk" + chunk.chunk_ID + " Data.json", json);
 
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
@@ -428,20 +424,20 @@ public class ChunkManager : MonoBehaviour
 
     public bool HasChunks()
     {
-        return !(chunks == null);
+        return !(chunk_data.chunks == null);
     }
 
     private void GenerateChunkNeighbours()
     {
-        for (int i = 0; i < chunks.Count; i++)
+        for (int i = 0; i < chunk_data.chunks.Count; i++)
         {
-            Chunk chunk = chunks[i];
+            Chunk chunk = chunk_data.chunks[i];
 
-            float box_size = chunk_size * 2;
+            float box_size = chunk_data.chunk_size * 2;
 
             Bounds box = new Bounds(chunk.chunk_pos, new Vector3(box_size, box_size, box_size));
 
-            foreach (Chunk other_chunk in chunks)
+            foreach (Chunk other_chunk in chunk_data.chunks)
             {
                 if (box.Intersects(other_chunk.chunk_bounds) && chunk.chunk_ID != other_chunk.chunk_ID)
                 {
@@ -554,24 +550,24 @@ public class ChunkManager : MonoBehaviour
         return obj;
     }
 
-    public List<Chunk> GetChunks()
+    public ChunkData GetChunks()
     {
-        return chunks;
+        return chunk_data;
     }
 
     public Chunk GetCurrentChunk()
     {
-        return current_chunk;
+        return chunk_data.current_chunk;
     }
 
     public void SetCurrentChunk(Chunk chunk)
     {
-        current_chunk = chunk;
+        chunk_data.current_chunk = chunk;
     }
 
     public Chunk GetChunk(int chunk_id)
     {
-        foreach (Chunk chunk in chunks)
+        foreach (Chunk chunk in chunk_data.chunks)
         {
             if (chunk.chunk_ID == chunk_id)
             {
@@ -583,7 +579,7 @@ public class ChunkManager : MonoBehaviour
 
     public Chunk GetChunkAtLoc(Vector3 pos)
     {
-        foreach (Chunk chunk in chunks)
+        foreach (Chunk chunk in chunk_data.chunks)
         {
             if (chunk.chunk_bounds.Contains(pos))
             {
@@ -598,7 +594,8 @@ public class ChunkManager : MonoBehaviour
     {
         if (HasChunks())
         {
-            foreach (Chunk chunk in chunks)
+            float chunk_size = chunk_data.chunk_size;
+            foreach (Chunk chunk in chunk_data.chunks)
             {
                 Gizmos.DrawWireCube(chunk.chunk_pos, new Vector3(chunk_size, chunk_size, chunk_size));
             }
