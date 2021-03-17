@@ -44,6 +44,8 @@ public class ChunkManager : MonoBehaviour
 
     public void InitialiseSpawnChunks(int chunk_id)
     {
+        ClearAllObjects();
+
         chunk_data = new ChunkData();
         chunk_data.chunks = new List<Chunk>();
 
@@ -54,6 +56,19 @@ public class ChunkManager : MonoBehaviour
         {
             LoadChunk(GetChunkFromFile(neighbor));
         }
+    }
+
+    public void SaveChunk(Chunk chunk)
+    {
+        if (Directory.Exists(Application.dataPath + chunk_data.directory))
+        {
+            string json = JsonUtility.ToJson(chunk);
+            File.WriteAllText(Application.dataPath + chunk_data.directory + "/Chunk" + chunk.chunk_ID + " Data.json", json);
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+        }
+
     }
 
     //Logic to Load/Unlod the correct chunks on entering a new one
@@ -166,11 +181,18 @@ public class ChunkManager : MonoBehaviour
     //Destroy a Chunk in the world
     public void UnloadChunk(Chunk chunk)
     {
+        RefreshChunkObjects(chunk);
         //NEEDS RESAVING?
         if (chunk.objects.Count > 0)
         {
+            Debug.Log("Chunk " + chunk.chunk_ID + "has " + chunk.objects.Count + "objects");
+
+            SaveChunk(chunk);
+
             foreach (Obj obj in chunk.objects)
             {
+                Debug.Log(obj.runtime_ref);
+
                 Destroy(obj.runtime_ref);
                 obj.runtime_ref = null;
             }
@@ -182,10 +204,8 @@ public class ChunkManager : MonoBehaviour
 
     #region Editor Functions
 
-    public void MakeChunks(ChunkData _chunk_data)
+    public void MakeChunks()
     {
-        chunk_data = _chunk_data;
-
         length = testPlane.GetComponent<Renderer>().bounds.size.x;
 
         int chunk_numbers = divides * divides;
@@ -334,14 +354,7 @@ public class ChunkManager : MonoBehaviour
     {
         foreach (Chunk chunk in chunk_data.chunks)
         {
-            if (Directory.Exists(Application.dataPath + chunk_data.directory))
-            {
-                string json = JsonUtility.ToJson(chunk);
-                File.WriteAllText(Application.dataPath + chunk_data.directory + "/Chunk" + chunk.chunk_ID + " Data.json", json);
-
-                AssetDatabase.SaveAssets();
-                AssetDatabase.Refresh();
-            }
+            SaveChunk(chunk);
         }
 
     }
@@ -403,7 +416,7 @@ public class ChunkManager : MonoBehaviour
         go.transform.rotation = local_obj_transform.rotation;
         go.transform.localScale = local_obj_transform.localScale;
 
-        
+
         //refabUtility.SaveAsPrefabAssetAndConnect(mesh_filter.gameObject, ob_path, InteractionMode.UserAction);
 
         if (optimizeMesh)
@@ -422,9 +435,56 @@ public class ChunkManager : MonoBehaviour
 
     #region HelperFunctions
 
+    public void RefreshChunkObjects(Chunk chunk)
+    {
+        FindWorldObjects();
+
+        foreach (GameObject go in world_objects)
+        {
+            if (chunk.chunk_bounds.Contains(go.transform.position))
+            {
+                if (!ChunksHaveObject(go))
+                {
+                    Debug.Log("Initalised Object in Chunk " + chunk.chunk_ID);
+                    InitialseObj(chunk, go).runtime_ref = go;
+                }
+                else
+                {
+                    Debug.Log("Chunk " + chunk.chunk_ID + "Already has " + go.name);
+                }
+            }
+        }
+    }
+
+    public bool ChunksHaveObject(GameObject go)
+    {
+        foreach (Chunk chunk in chunk_data.chunks)
+        {
+            foreach (Obj obj in chunk.objects)
+            {
+                if (obj.runtime_ref == go)
+                {
+                    print("Found object " + obj.runtime_ref.name + " in chunk " + chunk.chunk_ID);
+                    return true;
+                }
+            }
+            print("not in chunk " + chunk.chunk_ID);
+        }
+        return false;
+    }
+
     public bool HasChunks()
     {
         return !(chunk_data.chunks == null);
+    }
+
+    public void ClearAllObjects()
+    {
+        FindWorldObjects();
+        foreach (GameObject go in world_objects)
+        {
+            DestroyImmediate(go);
+        }
     }
 
     private void GenerateChunkNeighbours()
@@ -525,7 +585,6 @@ public class ChunkManager : MonoBehaviour
 
         if (go.GetComponent<MeshRenderer>() != null)
         {
-            Debug.Log("Adding material/mesh");
             Material[] mats = go.GetComponent<MeshRenderer>().sharedMaterials;
 
             obj.obj_mats = new List<string>();

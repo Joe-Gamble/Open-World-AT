@@ -37,6 +37,7 @@ public struct WorldData
     public LightingPresets lighting_presets;
 }
 
+[ExecuteInEditMode]
 public class WorldManager : MonoBehaviour
 {
     public WorldData data;
@@ -49,6 +50,8 @@ public class WorldManager : MonoBehaviour
     private World.SeasonState current_season;
     private World.Region current_region;
 
+    public GameObject test;
+
     private GameObject player;
 
     private int spawn_chunk = 4;
@@ -56,15 +59,15 @@ public class WorldManager : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        Initialise();
+    }
+
+    public void Initialise()
+    {
         chunkManager = this.GetComponent<ChunkManager>();
         lighting_manager = this.GetComponent<LightingManager>();
         player = GameObject.FindGameObjectWithTag("Player");
 
-        Initialise();
-    }
-
-    void Initialise()
-    {
         chunkManager.InitialiseSpawnChunks(spawn_chunk);
         lighting_manager.LoadLightingPresets();
 
@@ -82,41 +85,48 @@ public class WorldManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        ExtractFromScripts();
-
-        #region Lighting
-
         if (Application.isPlaying)
         {
+            #region Lighting
+
             time_of_day += Time.deltaTime / 10;
             time_of_day %= 24;
             lighting_manager.UpdateLighting(time_of_day / 24f);
+
+            #endregion
+
+            #region Chunks
+
+            Chunk current_chunk = chunkManager.GetCurrentChunk();
+            if (!current_chunk.chunk_bounds.Contains(player.transform.position))
+            {
+                foreach (int neighbour in current_chunk.chunk_neighbours)
+                {
+                    if (chunkManager.GetChunk(neighbour).chunk_bounds.Contains(player.transform.position))
+                    {
+                        //Debug.Log(neighbour);
+
+                        chunkManager.EnterNewChunk(chunkManager.GetChunk(neighbour));
+                        break;
+                    }
+                }
+            }
+
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                GameObject go = GameObject.Instantiate(test, player.transform.position, Quaternion.identity);
+                go.transform.parent = GameObject.Find("World Objects").transform;
+            }
+
+            #endregion
         }
         else
         {
             lighting_manager.UpdateLighting(time_of_day / 24f);
         }
 
-        #endregion
 
-        #region Chunks
 
-        Chunk current_chunk = data.chunk_data.current_chunk;
-        if (!current_chunk.chunk_bounds.Contains(player.transform.position))
-        {
-            foreach (int neighbour in current_chunk.chunk_neighbours)
-            {
-                if (chunkManager.GetChunk(neighbour).chunk_bounds.Contains(player.transform.position))
-                {
-                    Debug.Log(neighbour);
-
-                    chunkManager.EnterNewChunk(chunkManager.GetChunk(neighbour));
-                    break;
-                }
-            }
-        }
-
-        #endregion
     }
 }
 
@@ -138,7 +148,11 @@ public class WorldManagerEditor : EditorWindow
 
     private void OnEnable()
     {
-        LinkScripts();
+        if (world_manager_instance == null)
+        {
+            world_manager_instance = GameObject.FindGameObjectWithTag("GameController");
+            LinkScripts();
+        }
     }
 
     private void LinkScripts()
@@ -157,6 +171,7 @@ public class WorldManagerEditor : EditorWindow
             if (lighting_manager == null)
             {
                 lighting_manager = world_manager_instance.GetComponent<LightingManager>();
+                presets = lighting_manager.GetPresets();
             }
         }
     }
@@ -166,7 +181,6 @@ public class WorldManagerEditor : EditorWindow
     {
         //Show existing window instance. If one doesn't exist, make one.
         EditorWindow.GetWindow(typeof(WorldManagerEditor));
-
     }
 
     void OnInspectorUpdate()
@@ -180,36 +194,32 @@ public class WorldManagerEditor : EditorWindow
 
         world_manager_instance = (GameObject)EditorGUILayout.ObjectField("World Manager", world_manager_instance, typeof(GameObject), true);
 
-        LinkScripts();
-
         #region Chunk Tools
 
         EditorGUILayout.LabelField("Chunk Tools", EditorStyles.boldLabel);
 
         if (GUILayout.Button("Generate Chunks"))
         {
-            chunk_manager.UpdateDirectories();
-
             chunk_manager.FindWorldObjects();
 
             if (chunk_manager.HasChunks())
             {
                 chunk_manager.RemoveChunks();
             }
-            chunk_manager.MakeChunks(data.chunk_data);
+            chunk_manager.MakeChunks();
         }
 
         if (chunk_manager.HasChunks())
         {
             if (GUILayout.Button("Delete Chunks"))
             {
-                //chunkManager.RespawnObjectsFromJson();
                 chunk_manager.UpdateDirectories();
                 chunk_manager.RemoveChunks();
             }
 
             if (GUILayout.Button("Collect World Data"))
             {
+                chunk_manager.UpdateDirectories();
                 chunk_manager.CollectData();
             }
         }

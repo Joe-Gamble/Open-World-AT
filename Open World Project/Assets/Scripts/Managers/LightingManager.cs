@@ -88,6 +88,11 @@ public class LightingManager : MonoBehaviour
 
     public void UpdateLighting(float time_percent)
     {
+        if (lighting_presets.presets == null)
+        {
+            LoadLightingPresets();
+        }
+
         RenderSettings.ambientLight = lighting_presets.current_preset.ambient_color.Evaluate(time_percent);
         RenderSettings.fogColor = lighting_presets.current_preset.fog_color.Evaluate(time_percent);
 
