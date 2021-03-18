@@ -58,15 +58,19 @@ public class ChunkManager : MonoBehaviour
         }
     }
 
-    public void SaveChunk(Chunk chunk)
+    public void OverrideChunkData(Chunk chunk)
     {
-        if (Directory.Exists(Application.dataPath + chunk_data.directory))
-        {
-            string json = JsonUtility.ToJson(chunk);
-            File.WriteAllText(Application.dataPath + chunk_data.directory + "/Chunk" + chunk.chunk_ID + " Data.json", json);
 
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
+        string path = Application.dataPath + "/Resources/World Data/Chunks/Chunk" + chunk.chunk_ID + " Data.json";
+        string json = JsonUtility.ToJson(chunk);
+
+        File.WriteAllText(path, json);
+
+        AssetDatabase.Refresh();
+
+        foreach (Obj obj in chunk.objects)
+        {
+            print(obj.name);
         }
 
     }
@@ -182,16 +186,17 @@ public class ChunkManager : MonoBehaviour
     public void UnloadChunk(Chunk chunk)
     {
         RefreshChunkObjects(chunk);
+
         //NEEDS RESAVING?
         if (chunk.objects.Count > 0)
         {
             Debug.Log("Chunk " + chunk.chunk_ID + "has " + chunk.objects.Count + "objects");
 
-            SaveChunk(chunk);
+            OverrideChunkData(chunk);
 
             foreach (Obj obj in chunk.objects)
             {
-                Debug.Log(obj.runtime_ref);
+                Debug.Log("Deleted");
 
                 Destroy(obj.runtime_ref);
                 obj.runtime_ref = null;
@@ -269,7 +274,7 @@ public class ChunkManager : MonoBehaviour
                 if (chunk.chunk_bounds.Contains(world_objects[i].gameObject.transform.position))
                 {
                     SaveWorldData(InitialseObj(chunk, world_objects[i].gameObject));
-                    Debug.Log("Added " + world_objects[i].name + " to Chunk " + chunk.chunk_ID);
+                    //Debug.Log("Added " + world_objects[i].name + " to Chunk " + chunk.chunk_ID);
                     DestroyImmediate(world_objects[i].gameObject);
                     break;
                 }
@@ -287,9 +292,14 @@ public class ChunkManager : MonoBehaviour
         {
             foreach (string mat in go.obj_mats)
             {
+                Debug.Log("Moving Asset");
                 if (Resources.Load("World Data/Materials/" + mat) == null)
                 {
-                    AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(Resources.Load("World Data/Materials/" + mat)), m_path + "Materials/" + mat + ".mat");
+                    Debug.Log("Moving Asset");
+                    Debug.Log(m_path + "Materials/" + mat + ".mat");
+
+                    string status = AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(Resources.Load("World Data/Materials/" + mat)), m_path + "Materials/");
+                    Debug.Log(status);
                 }
             }
         }
@@ -348,16 +358,21 @@ public class ChunkManager : MonoBehaviour
             }
         }
         AssetDatabase.Refresh();
+        AssetDatabase.SaveAssets();
     }
 
     public void SaveChunkData()
     {
         foreach (Chunk chunk in chunk_data.chunks)
         {
-            SaveChunk(chunk);
+            OverrideChunkData(chunk);
         }
 
     }
+    #endregion
+
+    #region inactive code
+    /*
 
     public void RespawnObjectsFromJson()
     {
@@ -377,10 +392,7 @@ public class ChunkManager : MonoBehaviour
             LoadChunk(chunk);
         }
     }
-    #endregion
 
-    #region inactive code
-    /*
     public void SaveWorld()
     {
         foreach (Chunk chunk in chunks)
@@ -445,7 +457,6 @@ public class ChunkManager : MonoBehaviour
             {
                 if (!ChunksHaveObject(go))
                 {
-                    Debug.Log("Initalised Object in Chunk " + chunk.chunk_ID);
                     InitialseObj(chunk, go).runtime_ref = go;
                 }
                 else
@@ -464,11 +475,10 @@ public class ChunkManager : MonoBehaviour
             {
                 if (obj.runtime_ref == go)
                 {
-                    print("Found object " + obj.runtime_ref.name + " in chunk " + chunk.chunk_ID);
+                    Debug.Log("Added Obj");
                     return true;
                 }
             }
-            print("not in chunk " + chunk.chunk_ID);
         }
         return false;
     }
