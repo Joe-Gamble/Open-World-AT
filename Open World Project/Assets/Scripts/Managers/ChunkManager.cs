@@ -60,19 +60,12 @@ public class ChunkManager : MonoBehaviour
 
     public void OverrideChunkData(Chunk chunk)
     {
-
         string path = Application.dataPath + "/Resources/World Data/Chunks/Chunk" + chunk.chunk_ID + " Data.json";
         string json = JsonUtility.ToJson(chunk);
 
         File.WriteAllText(path, json);
 
         AssetDatabase.Refresh();
-
-        foreach (Obj obj in chunk.objects)
-        {
-            print(obj.name);
-        }
-
     }
 
     //Logic to Load/Unlod the correct chunks on entering a new one
@@ -112,26 +105,32 @@ public class ChunkManager : MonoBehaviour
         for (int i = 0; i < chunk.objects.Count(); i++)
         {
             Obj obj = chunk.objects[i];
-
             GameObject go;
+            List<Material> mats = new List<Material>();
 
             //Unity Primitive
             if (obj.is_unity_primitive)
             {
                 go = GameObject.CreatePrimitive(obj.primitive_type);
 
+                Material default_mat = go.GetComponent<MeshRenderer>().sharedMaterial;
+
                 if (obj.obj_mats != null)
                 {
-                    List<Material> mats = new List<Material>();
-
                     foreach (string mat_name in obj.obj_mats)
                     {
-                        mats.Add(Resources.Load("World Data/Materials/" + mat_name, typeof(Material)) as Material);
+                        if (mat_name == "Default-Material")
+                        {
+                            mats.Add(default_mat);
+                        }
+                        else
+                        {
+                            mats.Add(Resources.Load("World Data/Materials/" + mat_name, typeof(Material)) as Material);
+                        }
                     }
-
-                    go.GetComponent<MeshRenderer>().sharedMaterials = mats.ToArray();
                 }
             }
+
             //Non Unity Object
             else
             {
@@ -140,15 +139,13 @@ public class ChunkManager : MonoBehaviour
                 go.AddComponent<MeshFilter>().sharedMesh = Resources.Load<Mesh>("World Data/Meshes/" + obj.obj_mesh);
                 go.AddComponent<MeshRenderer>();
 
-                List<Material> mats = new List<Material>();
-
                 foreach (string mat_name in obj.obj_mats)
                 {
                     mats.Add(Resources.Load("World Data/Materials/" + mat_name, typeof(Material)) as Material);
                 }
-
-                go.GetComponent<MeshRenderer>().sharedMaterials = mats.ToArray();
             }
+
+            go.GetComponent<MeshRenderer>().sharedMaterials = mats.ToArray();
 
             go.name = obj.name;
 
@@ -196,8 +193,6 @@ public class ChunkManager : MonoBehaviour
 
             foreach (Obj obj in chunk.objects)
             {
-                Debug.Log("Deleted");
-
                 Destroy(obj.runtime_ref);
                 obj.runtime_ref = null;
             }
@@ -236,6 +231,8 @@ public class ChunkManager : MonoBehaviour
 
             chunk.chunk_ID = i;
 
+            Debug.Log(i);
+
             chunk.chunk_bounds = new Bounds(chunk.chunk_pos, new Vector3(chunk_data.chunk_size, chunk_data.chunk_size, chunk_data.chunk_size));
 
             chunk.objects = new List<Obj>();
@@ -273,101 +270,20 @@ public class ChunkManager : MonoBehaviour
             {
                 if (chunk.chunk_bounds.Contains(world_objects[i].gameObject.transform.position))
                 {
-                    SaveWorldData(InitialseObj(chunk, world_objects[i].gameObject));
-                    //Debug.Log("Added " + world_objects[i].name + " to Chunk " + chunk.chunk_ID);
-                    DestroyImmediate(world_objects[i].gameObject);
+                    DestroyImmediate(InitialseObj(chunk, world_objects[i].gameObject).runtime_ref);
                     break;
                 }
             }
         }
-        SaveChunkData();
+        SaveAllChunkData();
     }
 
-    public void SaveWorldData(Obj go)
-    {
-        string m_path = "Assets/Resources/World Data/";
-
-        //Materials
-        if (go.obj_mats != null)
-        {
-            foreach (string mat in go.obj_mats)
-            {
-                Debug.Log("Moving Asset");
-                if (Resources.Load("World Data/Materials/" + mat) == null)
-                {
-                    Debug.Log("Moving Asset");
-                    Debug.Log(m_path + "Materials/" + mat + ".mat");
-
-                    string status = AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(Resources.Load("World Data/Materials/" + mat)), m_path + "Materials/");
-                    Debug.Log(status);
-                }
-            }
-        }
-
-        //Meshes
-        if (go.obj_mesh != null)
-        {
-            if (Resources.Load("World Data/Meshes/" + go.obj_mesh) == null)
-            {
-                string status = AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(Resources.Load("World Data/Meshes/" + go.obj_mesh)), m_path + "Meshes/" + go.obj_mesh + ".fbx");
-
-                if (status != "")
-                {
-                    // print(status);
-                    go.is_unity_primitive = true;
-
-                    switch (go.obj_mesh)
-                    {
-                        case "Cube":
-                            {
-                                go.primitive_type = PrimitiveType.Cube;
-                                break;
-                            }
-                        case "Sphere":
-                            {
-                                go.primitive_type = PrimitiveType.Sphere;
-                                break;
-                            }
-                        case "Capsule":
-                            {
-                                go.primitive_type = PrimitiveType.Capsule;
-                                break;
-                            }
-                        case "Plane":
-                            {
-                                go.primitive_type = PrimitiveType.Plane;
-                                break;
-                            }
-                        case "Cylinder":
-                            {
-                                go.primitive_type = PrimitiveType.Cylinder;
-                                break;
-                            }
-                        case "Quad":
-                            {
-                                go.primitive_type = PrimitiveType.Quad;
-                                break;
-                            }
-                        default:
-                            {
-                                go.primitive_type = PrimitiveType.Cube;
-                                break;
-                            }
-                    }
-                }
-            }
-        }
-        AssetDatabase.Refresh();
-        AssetDatabase.SaveAssets();
-    }
-
-    public void SaveChunkData()
+    public void SaveAllChunkData()
     {
         foreach (Chunk chunk in chunk_data.chunks)
         {
             OverrideChunkData(chunk);
         }
-
     }
     #endregion
 
@@ -457,7 +373,8 @@ public class ChunkManager : MonoBehaviour
             {
                 if (!ChunksHaveObject(go))
                 {
-                    InitialseObj(chunk, go).runtime_ref = go;
+                    Obj obj = InitialseObj(chunk, go);
+                    obj.runtime_ref = go;
                 }
                 else
                 {
@@ -567,6 +484,95 @@ public class ChunkManager : MonoBehaviour
         }
     }
 
+    public void SaveObjectData(Obj obj, Material[] mats, Mesh sm)
+    {
+        obj.obj_mats = new List<string>();
+
+        foreach (Material mat in mats)
+        {
+            obj.obj_mats.Add(mat.name);
+        }
+        obj.obj_mesh = sm.name;
+
+        string m_path = "Assets/Resources/World Data/";
+
+        //Meshes
+        if (obj.obj_mesh != null)
+        {
+            if (Resources.Load("World Data/Meshes/" + obj.obj_mesh) == null)
+            {
+                string status = AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(Resources.Load("World Data/Meshes/" + obj.obj_mesh)), m_path + "Meshes/" + obj.obj_mesh + ".fbx");
+
+                if (status != "")
+                {
+                    // print(status);
+                    obj.is_unity_primitive = true;
+
+                    switch (obj.obj_mesh)
+                    {
+                        case "Cube":
+                            {
+                                obj.primitive_type = PrimitiveType.Cube;
+                                break;
+                            }
+                        case "Sphere":
+                            {
+                                obj.primitive_type = PrimitiveType.Sphere;
+                                break;
+                            }
+                        case "Capsule":
+                            {
+                                obj.primitive_type = PrimitiveType.Capsule;
+                                break;
+                            }
+                        case "Plane":
+                            {
+                                obj.primitive_type = PrimitiveType.Plane;
+                                break;
+                            }
+                        case "Cylinder":
+                            {
+                                obj.primitive_type = PrimitiveType.Cylinder;
+                                break;
+                            }
+                        case "Quad":
+                            {
+                                obj.primitive_type = PrimitiveType.Quad;
+                                break;
+                            }
+                        default:
+                            {
+                                obj.primitive_type = PrimitiveType.Cube;
+                                break;
+                            }
+                    }
+                }
+            }
+        }
+
+        //Materials
+        if (obj.obj_mats.Count > 0)
+        {
+            foreach (Material mat in mats)
+            {
+                Debug.Log("Moving Asset");
+                if (Resources.Load("World Data/Materials/" + mat) == null)
+                {
+                    Debug.Log("Moving Asset");
+                    Debug.Log(m_path + "Materials/" + mat + ".mat");
+
+                    Debug.Log(AssetDatabase.GetAssetPath(mat));
+
+                    string status = AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(mat), m_path + "Materials/" + mat.name + ".mat");
+                    Debug.Log(status);
+                }
+            }
+        }
+
+        AssetDatabase.Refresh();
+        AssetDatabase.SaveAssets();
+    }
+
     public Obj InitialseObj(Chunk chunk, GameObject go)
     {
         Obj obj = new Obj();
@@ -587,7 +593,6 @@ public class ChunkManager : MonoBehaviour
             {
                 Obj obj_child = InitialseObj(chunk, go.transform.GetChild(i).gameObject);
                 obj.child_names.Add(obj_child.name);
-                SaveWorldData(obj_child);
             }
         }
 
@@ -596,15 +601,9 @@ public class ChunkManager : MonoBehaviour
         if (go.GetComponent<MeshRenderer>() != null)
         {
             Material[] mats = go.GetComponent<MeshRenderer>().sharedMaterials;
+            Mesh sm = go.GetComponent<MeshFilter>().sharedMesh;
 
-            obj.obj_mats = new List<string>();
-
-            foreach (Material mat in mats)
-            {
-                obj.obj_mats.Add(mat.name);
-            }
-
-            obj.obj_mesh = go.GetComponent<MeshFilter>().sharedMesh.name;
+            SaveObjectData(obj, mats, sm);
         }
 
         Transform trans = go.GetComponent<Transform>();
@@ -614,6 +613,8 @@ public class ChunkManager : MonoBehaviour
         obj.obj_position = trans.position;
         obj.obj_rotation = trans.rotation;
         obj.obj_scale = trans.localScale;
+
+        obj.runtime_ref = go;
 
         chunk.objects.Add(obj);
         return obj;

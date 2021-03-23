@@ -54,7 +54,7 @@ public class WorldManager : MonoBehaviour
 
     private GameObject player;
 
-    private int spawn_chunk = 4;
+    private int spawn_chunk = 6;
 
     // Start is called before the first frame update
     void Start()
@@ -104,8 +104,6 @@ public class WorldManager : MonoBehaviour
                 {
                     if (chunkManager.GetChunk(neighbour).chunk_bounds.Contains(player.transform.position))
                     {
-                        //Debug.Log(neighbour);
-
                         chunkManager.EnterNewChunk(chunkManager.GetChunk(neighbour));
                         break;
                     }
@@ -124,9 +122,6 @@ public class WorldManager : MonoBehaviour
         {
             lighting_manager.UpdateLighting(time_of_day / 24f);
         }
-
-
-
     }
 }
 
@@ -198,8 +193,11 @@ public class WorldManagerEditor : EditorWindow
 
         EditorGUILayout.LabelField("Chunk Tools", EditorStyles.boldLabel);
 
+        int d = EditorGUILayout.IntField("Spilts", lighting_manager.number_of_presets);
+
         if (GUILayout.Button("Generate Chunks"))
         {
+            chunk_manager.divides = d;
             chunk_manager.FindWorldObjects();
 
             if (chunk_manager.HasChunks())
@@ -230,7 +228,7 @@ public class WorldManagerEditor : EditorWindow
 
         EditorGUILayout.LabelField("Lighting Settings", EditorStyles.boldLabel);
 
-        lighting_manager.number_of_presets = EditorGUILayout.IntField(lighting_manager.number_of_presets);
+        lighting_manager.number_of_presets = EditorGUILayout.IntField("Number of Presets", lighting_manager.number_of_presets);
 
         for (int i = 0; i < presets.presets.Count; i++)
         {
