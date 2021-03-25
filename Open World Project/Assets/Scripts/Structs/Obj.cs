@@ -3,9 +3,16 @@ using System.Collections.Generic;
 using UnityEngine;
 using System;
 
+enum ObjectTypes
+{
+    BASIC,
+    ENTITY
+}
+
 [Serializable]
 public class Obj
 {
+    ObjectTypes object_type = ObjectTypes.BASIC;
     public GameObject runtime_ref;
 
     public string obj_parent = null;
@@ -22,6 +29,11 @@ public class Obj
 
     public string obj_mesh;
     public List<string> obj_mats;
+    public string collider_type;
+}
 
-    public Collider obj_col;
+[Serializable]
+public class Entity : Obj
+{
+
 }

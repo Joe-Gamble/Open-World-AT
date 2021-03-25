@@ -104,7 +104,7 @@ public class WorldManager : MonoBehaviour
                 {
                     if (chunkManager.GetChunk(neighbour).chunk_bounds.Contains(player.transform.position))
                     {
-                        chunkManager.EnterNewChunk(chunkManager.GetChunk(neighbour));
+                        chunkManager.EnterNewChunk(false, chunkManager.GetChunk(neighbour));
                         break;
                     }
                 }
@@ -195,10 +195,14 @@ public class WorldManagerEditor : EditorWindow
 
         int d = EditorGUILayout.IntField("Spilts", lighting_manager.number_of_presets);
 
+        if (GUILayout.Button("Read Current Chunks"))
+        {
+            chunk_manager.LoadChunksFromDisk();
+        }
+
         if (GUILayout.Button("Generate Chunks"))
         {
             chunk_manager.divides = d;
-            chunk_manager.FindWorldObjects();
 
             if (chunk_manager.HasChunks())
             {

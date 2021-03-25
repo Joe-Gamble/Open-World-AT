@@ -24,6 +24,13 @@ public class ChunkManager : MonoBehaviour
 
     private List<GameObject> world_objects;
 
+    private List<Obj> pending_childs = new List<Obj>();
+
+    /// <summary>
+    /// Idea 1: Store a list of pending childs/parents
+    /// Idea 2: 
+    /// </summary>
+
     void Start()
     {
 
@@ -49,13 +56,7 @@ public class ChunkManager : MonoBehaviour
         chunk_data = new ChunkData();
         chunk_data.chunks = new List<Chunk>();
 
-        SetCurrentChunk(GetChunkFromFile(chunk_id));
-        LoadChunk(chunk_data.current_chunk);
-
-        foreach (int neighbor in chunk_data.current_chunk.chunk_neighbours)
-        {
-            LoadChunk(GetChunkFromFile(neighbor));
-        }
+        EnterNewChunk(true, GetChunkFromFile(chunk_id));
     }
 
     public void OverrideChunkData(Chunk chunk)
@@ -69,33 +70,47 @@ public class ChunkManager : MonoBehaviour
     }
 
     //Logic to Load/Unlod the correct chunks on entering a new one
-    public void EnterNewChunk(Chunk new_chunk)
+    public void EnterNewChunk(bool spawning, Chunk new_chunk)
     {
-        List<int> needed_neighbours = new List<int>();
-
-        foreach (int old_chunk_id in chunk_data.current_chunk.chunk_neighbours)
+        if (spawning)
         {
-            if (new_chunk.chunk_neighbours.Exists(x => x == old_chunk_id))
+            LoadChunk(new_chunk);
+
+            foreach (int neighbor in new_chunk.chunk_neighbours)
             {
-                needed_neighbours.Add(old_chunk_id);
+                LoadChunk(GetChunkFromFile(neighbor));
             }
-            else if (old_chunk_id == new_chunk.chunk_ID)
+        }
+        else
+        {
+            List<int> needed_neighbours = new List<int>();
+
+            foreach (int old_chunk_id in chunk_data.current_chunk.chunk_neighbours)
             {
-                needed_neighbours.Add(chunk_data.current_chunk.chunk_ID);
+                if (new_chunk.chunk_neighbours.Exists(x => x == old_chunk_id))
+                {
+                    needed_neighbours.Add(old_chunk_id);
+                }
+                else if (old_chunk_id == new_chunk.chunk_ID)
+                {
+                    needed_neighbours.Add(chunk_data.current_chunk.chunk_ID);
+                }
+                else
+                {
+                    UnloadChunk(GetChunk(old_chunk_id));
+                }
             }
-            else
+
+            foreach (int new_chunk_neighbor_id in new_chunk.chunk_neighbours)
             {
-                UnloadChunk(GetChunk(old_chunk_id));
+                if (!needed_neighbours.Contains(new_chunk_neighbor_id))
+                {
+                    LoadChunk(GetChunkFromFile(new_chunk_neighbor_id));
+                }
             }
         }
 
-        foreach (int new_chunk_neighbor_id in new_chunk.chunk_neighbours)
-        {
-            if (!needed_neighbours.Contains(new_chunk_neighbor_id))
-            {
-                LoadChunk(GetChunkFromFile(new_chunk_neighbor_id));
-            }
-        }
+        LinkChildren();
         SetCurrentChunk(new_chunk);
     }
 
@@ -136,23 +151,57 @@ public class ChunkManager : MonoBehaviour
             {
                 go = new GameObject();
 
-                go.AddComponent<MeshFilter>().sharedMesh = Resources.Load<Mesh>("World Data/Meshes/" + obj.obj_mesh);
-                go.AddComponent<MeshRenderer>();
-
-                foreach (string mat_name in obj.obj_mats)
+                if (obj.obj_mesh != "")
                 {
-                    mats.Add(Resources.Load("World Data/Materials/" + mat_name, typeof(Material)) as Material);
+                    go.AddComponent<MeshFilter>().sharedMesh = Resources.Load<Mesh>("World Data/Meshes/" + obj.obj_mesh);
+                    go.AddComponent<MeshRenderer>();
+                }
+
+                if (obj.obj_mats != null)
+                {
+                    foreach (string mat_name in obj.obj_mats)
+                    {
+                        mats.Add(Resources.Load("World Data/Materials/" + mat_name, typeof(Material)) as Material);
+                    }
                 }
             }
 
-            go.GetComponent<MeshRenderer>().sharedMaterials = mats.ToArray();
+            go.TryGetComponent(out MeshRenderer mr);
 
-            go.name = obj.name;
+            if (mr != null)
+            {
+                mr.sharedMaterials = mats.ToArray();
+            }
+
+            if (obj.collider_type != "")
+            {
+                switch (obj.collider_type)
+                {
+                    case "UnityEngine.MeshCollider":
+                        {
+                            go.AddComponent<MeshCollider>();
+                            break;
+                        }
+                    case "UnityEngine.BoxCollider":
+                        {
+                            break;
+                        }
+                    case "UnityEngine.SphereCollider":
+                        {
+                            break;
+                        }
+                    case "UnityEngine.CapsuleCollider":
+                        {
+                            break;
+                        }
+                }
+            }
 
             go.GetComponent<Transform>().position = obj.obj_position;
             go.GetComponent<Transform>().rotation = obj.obj_rotation;
             go.GetComponent<Transform>().localScale = obj.obj_scale;
 
+            go.name = obj.name;
             obj.runtime_ref = go;
         }
 
@@ -160,20 +209,7 @@ public class ChunkManager : MonoBehaviour
         {
             if (obj.obj_parent != null)
             {
-                if (obj.obj_parent == "World Objects")
-                {
-                    obj.runtime_ref.transform.parent = GameObject.Find("World Objects").transform;
-                }
-                else
-                {
-                    foreach (Obj p_obj in chunk.objects)
-                    {
-                        if (p_obj.name == obj.obj_parent)
-                        {
-                            obj.runtime_ref.transform.parent = p_obj.runtime_ref.transform;
-                        }
-                    }
-                }
+                pending_childs.Add(obj);
             }
         }
         chunk_data.chunks.Add(chunk);
@@ -184,7 +220,6 @@ public class ChunkManager : MonoBehaviour
     {
         RefreshChunkObjects(chunk);
 
-        //NEEDS RESAVING?
         if (chunk.objects.Count > 0)
         {
             Debug.Log("Chunk " + chunk.chunk_ID + "has " + chunk.objects.Count + "objects");
@@ -215,12 +250,15 @@ public class ChunkManager : MonoBehaviour
 
         chunk_data = new ChunkData();
         chunk_data.chunks = new List<Chunk>();
+        pending_childs = new List<Obj>();
 
         chunk_data.chunk_size = length / divides;
 
         chunk_data.directory = "/Resources/World Data/Chunks/";
 
-        Vector3 pos = new Vector3(((0 - length / 2) + (chunk_data.chunk_size / 2)), testPlane.transform.position.y, ((0 - length / 2) + (chunk_data.chunk_size / 2)));
+        Vector3 plane_pos = testPlane.transform.position;
+
+        Vector3 pos = new Vector3((plane_pos.x + (0 - length / 2) + (chunk_data.chunk_size / 2)), plane_pos.y, (plane_pos.z + (0 - length / 2) + (chunk_data.chunk_size / 2)));
         float reset = pos.x;
 
         for (int i = 1; i <= chunk_numbers; i++)
@@ -231,9 +269,9 @@ public class ChunkManager : MonoBehaviour
 
             chunk.chunk_ID = i;
 
-            Debug.Log(i);
+            float size = chunk_data.chunk_size;
 
-            chunk.chunk_bounds = new Bounds(chunk.chunk_pos, new Vector3(chunk_data.chunk_size, chunk_data.chunk_size, chunk_data.chunk_size));
+            chunk.chunk_bounds = new Bounds(chunk.chunk_pos, new Vector3(size, size, size));
 
             chunk.objects = new List<Obj>();
 
@@ -259,23 +297,49 @@ public class ChunkManager : MonoBehaviour
     public void RemoveChunks()
     {
         chunk_data.chunks.Clear();
-        chunk_data.chunks = null;
+        chunk_data.chunks = new List<Chunk>();
     }
 
     public void CollectData()
     {
-        for (int i = 0; i < world_objects.Count; i++)
+        FindWorldObjects();
+
+        foreach (GameObject go in world_objects)
         {
-            foreach (Chunk chunk in chunk_data.chunks)
-            {
-                if (chunk.chunk_bounds.Contains(world_objects[i].gameObject.transform.position))
-                {
-                    DestroyImmediate(InitialseObj(chunk, world_objects[i].gameObject).runtime_ref);
-                    break;
-                }
-            }
+            InitialseObj(GetChunkAtLoc(go.transform.position), go);
         }
+
+        ClearAllObjects();
         SaveAllChunkData();
+    }
+
+    public void LoadChunksFromDisk()
+    {
+        string path = Application.dataPath + "/Resources/World Data/Chunks";
+        if (!IsDirectoryEmpty(path))
+        {
+            ClearAllObjects();
+            RemoveChunks();
+
+            DirectoryInfo chunks_path = new DirectoryInfo(path);
+            FileInfo[] assetsInfo = chunks_path.GetFiles("*.json", SearchOption.AllDirectories);
+
+            int i = 1;
+
+            pending_childs = new List<Obj>();
+
+            foreach (FileInfo fo in assetsInfo)
+            {
+                LoadChunk(GetChunkFromFile(i));
+                i++;
+            }
+            LinkChildren();
+        }
+        else
+        {
+            Debug.Log("No Chunks to Spawn");
+            return;
+        }
     }
 
     public void SaveAllChunkData()
@@ -289,6 +353,42 @@ public class ChunkManager : MonoBehaviour
 
     #region inactive code
     /*
+
+    if (obj.obj_parent == "World Objects")
+                {
+                    obj.runtime_ref.transform.parent = GameObject.Find("World Objects").transform;
+                }
+                else
+                {
+                    bool found_parent = false;
+                    //This is the problem 
+                    foreach (Obj p_obj in chunk.objects)
+                    {
+                        if (p_obj.name == obj.obj_parent)
+                        {
+                            obj.runtime_ref.transform.parent = p_obj.runtime_ref.transform;
+                            found_parent = true;
+                        }
+                    }
+                    if (!found_parent)
+                    {
+                        foreach (Chunk other_chunk in chunk_data.chunks)
+                        {
+                            foreach (Obj p_obj in other_chunk.objects)
+                            {
+                                if (p_obj.name == obj.obj_parent)
+                                {
+                                    obj.runtime_ref.transform.parent = p_obj.runtime_ref.transform;
+                                    found_parent = true;
+                                }
+                            }
+                        }
+                    }
+                    if (!found_parent)
+                    {
+                        pending_childs.Add(obj);
+                    }
+                }
 
     public void RespawnObjectsFromJson()
     {
@@ -363,6 +463,55 @@ public class ChunkManager : MonoBehaviour
 
     #region HelperFunctions
 
+    private void LinkChildren()
+    {
+        foreach (Chunk chunk in chunk_data.chunks)
+        {
+            foreach (Obj obj in chunk.objects)
+            {
+                if (obj.obj_parent == "World Objects")
+                {
+                    obj.runtime_ref.transform.parent = GameObject.Find("World Objects").transform;
+                }
+                else
+                {
+                    foreach (Obj other_obj in pending_childs)
+                    {
+                        if (obj.obj_parent == other_obj.name)
+                        {
+                            foreach (string name in other_obj.child_names)
+                            {
+                                if (name == obj.name)
+                                {
+                                    obj.runtime_ref.transform.parent = other_obj.runtime_ref.transform;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    public bool IsDirectoryEmpty(string path)
+    {
+        return !Directory.EnumerateFileSystemEntries(path).Any();
+    }
+
+    public static long DirCount(DirectoryInfo d)
+    {
+        long i = 0;
+        // Add file sizes.
+        FileInfo[] fis = d.GetFiles();
+        foreach (FileInfo fi in fis)
+        {
+            if (fi.Extension.Contains("mp3"))
+                i++;
+        }
+        return i;
+    }
+
     public void RefreshChunkObjects(Chunk chunk)
     {
         FindWorldObjects();
@@ -374,11 +523,10 @@ public class ChunkManager : MonoBehaviour
                 if (!ChunksHaveObject(go))
                 {
                     Obj obj = InitialseObj(chunk, go);
-                    obj.runtime_ref = go;
                 }
                 else
                 {
-                    Debug.Log("Chunk " + chunk.chunk_ID + "Already has " + go.name);
+                    //Debug.Log("Chunk " + chunk.chunk_ID + "Already has " + go.name);
                 }
             }
         }
@@ -392,7 +540,6 @@ public class ChunkManager : MonoBehaviour
             {
                 if (obj.runtime_ref == go)
                 {
-                    Debug.Log("Added Obj");
                     return true;
                 }
             }
@@ -437,14 +584,28 @@ public class ChunkManager : MonoBehaviour
     public void FindWorldObjects()
     {
         world_objects = new List<GameObject>();
-
         GameObject host = GameObject.FindGameObjectWithTag("World Objects");
-        Transform[] objects = new Transform[host.transform.childCount];
 
-        for (int i = 0; i < host.transform.childCount; i++)
+        ExtractChildrenFromObject(host);
+    }
+
+    public void ExtractChildrenFromObject(GameObject parent)
+    {
+        for (int i = 0; i < parent.transform.childCount; i++)
         {
-            objects[i] = host.transform.GetChild(i);
-            world_objects.Add(objects[i].gameObject);
+            Transform obj = parent.transform.GetChild(i);
+
+            world_objects.Add(obj.gameObject);
+
+            if (obj.childCount > 0)
+            {
+                Transform[] children = obj.GetComponentsInChildren<Transform>();
+
+                foreach (Transform child in children)
+                {
+                    ExtractChildrenFromObject(child.gameObject);
+                }
+            }
         }
     }
 
@@ -484,14 +645,18 @@ public class ChunkManager : MonoBehaviour
         }
     }
 
-    public void SaveObjectData(Obj obj, Material[] mats, Mesh sm)
+    public void SaveObjectData(Obj obj, GameObject go)
     {
         obj.obj_mats = new List<string>();
+
+        Material[] mats = go.GetComponent<MeshRenderer>().sharedMaterials;
+        Mesh sm = go.GetComponent<MeshFilter>().sharedMesh;
 
         foreach (Material mat in mats)
         {
             obj.obj_mats.Add(mat.name);
         }
+
         obj.obj_mesh = sm.name;
 
         string m_path = "Assets/Resources/World Data/";
@@ -501,7 +666,7 @@ public class ChunkManager : MonoBehaviour
         {
             if (Resources.Load("World Data/Meshes/" + obj.obj_mesh) == null)
             {
-                string status = AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(Resources.Load("World Data/Meshes/" + obj.obj_mesh)), m_path + "Meshes/" + obj.obj_mesh + ".fbx");
+                string status = AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(sm), m_path + "Meshes/" + obj.obj_mesh + ".fbx");
 
                 if (status != "")
                 {
@@ -555,18 +720,18 @@ public class ChunkManager : MonoBehaviour
         {
             foreach (Material mat in mats)
             {
-                Debug.Log("Moving Asset");
+                //Debug.Log("Moving Asset");
                 if (Resources.Load("World Data/Materials/" + mat) == null)
                 {
-                    Debug.Log("Moving Asset");
-                    Debug.Log(m_path + "Materials/" + mat + ".mat");
-
-                    Debug.Log(AssetDatabase.GetAssetPath(mat));
-
                     string status = AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(mat), m_path + "Materials/" + mat.name + ".mat");
-                    Debug.Log(status);
+                    //Debug.Log(status);
                 }
             }
+        }
+
+        if (go.TryGetComponent(out Collider col))
+        {
+            obj.collider_type = col.GetType().ToString();
         }
 
         AssetDatabase.Refresh();
@@ -589,21 +754,17 @@ public class ChunkManager : MonoBehaviour
         {
             obj.child_names = new List<string>();
 
-            for (int i = 0; i < go.transform.childCount; i++)
+            Transform[] children = go.GetComponentsInChildren<Transform>();
+
+            foreach (Transform child in children)
             {
-                Obj obj_child = InitialseObj(chunk, go.transform.GetChild(i).gameObject);
-                obj.child_names.Add(obj_child.name);
+                obj.child_names.Add(child.name);
             }
         }
 
-
-
         if (go.GetComponent<MeshRenderer>() != null)
         {
-            Material[] mats = go.GetComponent<MeshRenderer>().sharedMaterials;
-            Mesh sm = go.GetComponent<MeshFilter>().sharedMesh;
-
-            SaveObjectData(obj, mats, sm);
+            SaveObjectData(obj, go);
         }
 
         Transform trans = go.GetComponent<Transform>();
@@ -617,6 +778,7 @@ public class ChunkManager : MonoBehaviour
         obj.runtime_ref = go;
 
         chunk.objects.Add(obj);
+
         return obj;
     }
 
@@ -667,7 +829,11 @@ public class ChunkManager : MonoBehaviour
             float chunk_size = chunk_data.chunk_size;
             foreach (Chunk chunk in chunk_data.chunks)
             {
+                Gizmos.color = Color.white;
                 Gizmos.DrawWireCube(chunk.chunk_pos, new Vector3(chunk_size, chunk_size, chunk_size));
+
+                Gizmos.color = Color.yellow;
+                Gizmos.DrawWireCube(chunk.chunk_pos, new Vector3(chunk_size / 3, chunk_size, chunk_size / 3));
             }
         }
     }

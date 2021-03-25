@@ -9,6 +9,7 @@ public struct Chunk
     public Vector3 chunk_pos;
     public int chunk_ID;
     public List<Obj> objects;
+    public List<Entity> entities;
     public Bounds chunk_bounds;
     public BoxCollider chunk_collider;
     public List<int> chunk_neighbours;
@@ -17,6 +18,8 @@ public struct Chunk
 [Serializable]
 public struct ChunkData
 {
+    public Bounds detection_bounds;
+
     public Chunk current_chunk;
     public float chunk_size;
 
