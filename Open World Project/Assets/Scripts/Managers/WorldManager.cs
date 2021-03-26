@@ -200,6 +200,12 @@ public class WorldManagerEditor : EditorWindow
             chunk_manager.LoadChunksFromDisk();
         }
 
+        if (GUILayout.Button("Test Threading Functionality"))
+        {
+            chunk_manager.RefreshChunkObjects(chunk_manager.GetChunk(6));
+        }
+
+
         if (GUILayout.Button("Generate Chunks"))
         {
             chunk_manager.divides = d;
