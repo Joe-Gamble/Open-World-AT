@@ -31,17 +31,9 @@ namespace World
     }
 }
 
-public struct WorldData
-{
-    public ChunkData chunk_data;
-    public LightingPresets lighting_presets;
-}
-
 [ExecuteInEditMode]
 public class WorldManager : MonoBehaviour
 {
-    public WorldData data;
-
     private ChunkManager chunkManager;
     private LightingManager lighting_manager;
 
@@ -60,6 +52,7 @@ public class WorldManager : MonoBehaviour
     void Start()
     {
         Initialise();
+        chunkManager.ClearAllObjects();
     }
 
     public void Initialise()
@@ -78,8 +71,8 @@ public class WorldManager : MonoBehaviour
 
     void ExtractFromScripts()
     {
-        data.chunk_data = chunkManager.GetChunks();
-        data.lighting_presets = lighting_manager.GetPresets();
+        chunkManager.GetChunks();
+        //data.lighting_presets = lighting_manager.GetPresets();
     }
 
     // Update is called once per frame
@@ -137,8 +130,6 @@ public class WorldManagerEditor : EditorWindow
     private ChunkManager chunk_manager;
     private LightingManager lighting_manager;
 
-    private WorldData data;
-
     private LightingPresets presets;
 
     private void OnEnable()
@@ -157,7 +148,6 @@ public class WorldManagerEditor : EditorWindow
             if (world_manager == null)
             {
                 world_manager = world_manager_instance.GetComponent<WorldManager>();
-                data = world_manager.data;
             }
             if (chunk_manager == null)
             {

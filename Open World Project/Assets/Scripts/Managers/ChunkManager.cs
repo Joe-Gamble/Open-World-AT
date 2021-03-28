@@ -23,9 +23,6 @@ public class ChunkManager : MonoBehaviour
     private float length;
     public int divides = 3;
 
-    private List<GameObject> world_objects;
-    private List<GameObject> world_entities;
-
     private List<Obj> pending_childs = new List<Obj>();
 
     void Start()
@@ -56,24 +53,14 @@ public class ChunkManager : MonoBehaviour
         EnterNewChunk(true, GetChunkFromFile(chunk_id));
     }
 
-    public void OverrideChunkData(Chunk chunk)
-    {
-        string path = Application.dataPath + "/Resources/World Data/Chunks/Chunk" + chunk.chunk_ID + " Data.json";
-        string json = JsonUtility.ToJson(chunk);
-
-        File.WriteAllText(path, json);
-
-        AssetDatabase.Refresh();
-    }
-
     //Logic to Load/Unlod the correct chunks on entering a new one
-    public void EnterNewChunk(bool spawning, Chunk new_chunk)
+    public void EnterNewChunk(bool spawning, Chunk spawn_chunk)
     {
         if (spawning)
         {
-            LoadChunk(new_chunk);
+            LoadChunk(spawn_chunk);
 
-            foreach (int neighbor in new_chunk.chunk_neighbours)
+            foreach (int neighbor in spawn_chunk.chunk_neighbours)
             {
                 LoadChunk(GetChunkFromFile(neighbor));
             }
@@ -84,11 +71,11 @@ public class ChunkManager : MonoBehaviour
 
             foreach (int old_chunk_id in chunk_data.current_chunk.chunk_neighbours)
             {
-                if (new_chunk.chunk_neighbours.Exists(x => x == old_chunk_id))
+                if (spawn_chunk.chunk_neighbours.Exists(x => x == old_chunk_id))
                 {
                     needed_neighbours.Add(old_chunk_id);
                 }
-                else if (old_chunk_id == new_chunk.chunk_ID)
+                else if (old_chunk_id == spawn_chunk.chunk_ID)
                 {
                     needed_neighbours.Add(chunk_data.current_chunk.chunk_ID);
                 }
@@ -98,7 +85,7 @@ public class ChunkManager : MonoBehaviour
                 }
             }
 
-            foreach (int new_chunk_neighbor_id in new_chunk.chunk_neighbours)
+            foreach (int new_chunk_neighbor_id in spawn_chunk.chunk_neighbours)
             {
                 if (!needed_neighbours.Contains(new_chunk_neighbor_id))
                 {
@@ -108,45 +95,39 @@ public class ChunkManager : MonoBehaviour
         }
 
         LinkChildren();
-        SetCurrentChunk(new_chunk);
+        SetCurrentChunk(spawn_chunk);
     }
 
     //Instantiate a Chunk in the world
     public void LoadChunk(Chunk chunk)
     {
-        foreach (Obj obj in chunk.objects)
+        Debug.Log(chunk.chunk_ID + chunk.GetObjects().Count);
+
+        foreach (Obj obj in chunk.GetObjects())
         {
-            SpawnObject<Obj>(obj, obj.obj_type);
+            obj.SpawnObject();
 
             if (obj.obj_parent != null)
             {
                 pending_childs.Add(obj);
             }
         }
-        foreach (Entity ent in chunk.entities)
-        {
-            SpawnObject<Entity>(ent, ent.obj_type);
-
-            if (ent.obj_parent != null)
-            {
-                pending_childs.Add(ent);
-            }
-        }
         chunk_data.chunks.Add(chunk);
     }
+
 
     //Destroy a Chunk in the world
     public void UnloadChunk(Chunk chunk)
     {
         RefreshChunkObjects(chunk);
 
-        if (chunk.objects.Count > 0)
+        if (chunk.GetObjects().Count > 0)
         {
-            Debug.Log("Chunk " + chunk.chunk_ID + "has " + chunk.objects.Count + "objects");
+            Debug.Log("Chunk " + chunk.chunk_ID + "has " + chunk.GetObjects().Count + "objects");
 
-            OverrideChunkData(chunk);
+            chunk.OverrideData();
 
-            foreach (Obj obj in chunk.objects)
+            foreach (Obj obj in chunk.GetObjects())
             {
                 Destroy(obj.runtime_ref);
                 obj.runtime_ref = null;
@@ -170,6 +151,7 @@ public class ChunkManager : MonoBehaviour
 
         chunk_data = new ChunkData();
         chunk_data.chunks = new List<Chunk>();
+
         pending_childs = new List<Obj>();
 
         chunk_data.chunk_size = length / divides;
@@ -191,10 +173,9 @@ public class ChunkManager : MonoBehaviour
 
             float size = chunk_data.chunk_size;
 
-            chunk.chunk_bounds = new Bounds(chunk.chunk_pos, new Vector3(size, size, size));
+            chunk.chunk_bounds = new Bounds(chunk.chunk_pos, new Vector3(size, Mathf.Infinity, size));
 
-            chunk.objects = new List<Obj>();
-            chunk.entities = new List<Entity>();
+            chunk.ResetObjects();
 
             chunk.chunk_neighbours = new List<int>();
 
@@ -223,11 +204,10 @@ public class ChunkManager : MonoBehaviour
 
     public void CollectData()
     {
-        FindWorldObjects();
 
-        foreach (GameObject go in world_objects)
+        foreach (KeyValuePair<GameObject, ObjectTypes> wo in FindWorldObjects())
         {
-            InitialseObj(GetChunkAtLoc(go.transform.position), go);
+            GetChunkAtLoc(wo.Key.transform.position).InitialseObj(wo.Value, wo.Key);
         }
 
         ClearAllObjects();
@@ -267,7 +247,7 @@ public class ChunkManager : MonoBehaviour
     {
         foreach (Chunk chunk in chunk_data.chunks)
         {
-            OverrideChunkData(chunk);
+            chunk.OverrideData();
         }
     }
     #endregion
@@ -384,118 +364,11 @@ public class ChunkManager : MonoBehaviour
 
     #region HelperFunctions
 
-    private void SpawnObject<T>(T o, ObjectTypes type)
-    {
-        Obj obj;
-        switch (type)
-        {
-            case ObjectTypes.BASIC:
-                {
-                    obj = o as Obj;
-                    break;
-                }
-            case ObjectTypes.ENTITY:
-                {
-                    obj = o as Entity;
-                    break;
-                }
-            default:
-                {
-                    obj = o as Obj;
-                    break;
-                }
-        }
-        GameObject go;
-        List<Material> mats = new List<Material>();
-
-        //Unity Primitive
-        if (obj.is_unity_primitive)
-        {
-            go = GameObject.CreatePrimitive(obj.primitive_type);
-
-            Material default_mat = go.GetComponent<MeshRenderer>().sharedMaterial;
-
-            if (obj.obj_mats != null)
-            {
-                foreach (string mat_name in obj.obj_mats)
-                {
-                    if (mat_name == "Default-Material")
-                    {
-                        mats.Add(default_mat);
-                    }
-                    else
-                    {
-                        mats.Add(Resources.Load("World Data/Materials/" + mat_name, typeof(Material)) as Material);
-                    }
-                }
-            }
-        }
-
-        //Non Unity Object
-        else
-        {
-            go = new GameObject();
-
-            if (obj.obj_mesh != "")
-            {
-                go.AddComponent<MeshFilter>().sharedMesh = Resources.Load<Mesh>("World Data/Meshes/" + obj.obj_mesh);
-                go.AddComponent<MeshRenderer>();
-            }
-
-            if (obj.obj_mats != null)
-            {
-                foreach (string mat_name in obj.obj_mats)
-                {
-                    mats.Add(Resources.Load("World Data/Materials/" + mat_name, typeof(Material)) as Material);
-                }
-            }
-        }
-
-        go.TryGetComponent(out MeshRenderer mr);
-
-        if (mr != null)
-        {
-            mr.sharedMaterials = mats.ToArray();
-        }
-
-        if (obj.collider_type != "")
-        {
-            switch (obj.collider_type)
-            {
-                case "UnityEngine.MeshCollider":
-                    {
-                        go.AddComponent<MeshCollider>();
-                        break;
-                    }
-                case "UnityEngine.BoxCollider":
-                    {
-                        break;
-                    }
-                case "UnityEngine.SphereCollider":
-                    {
-                        break;
-                    }
-                case "UnityEngine.CapsuleCollider":
-                    {
-                        break;
-                    }
-            }
-        }
-
-        go.GetComponent<Transform>().position = obj.obj_position;
-        go.GetComponent<Transform>().rotation = obj.obj_rotation;
-        go.GetComponent<Transform>().localScale = obj.obj_scale;
-
-        go.name = obj.name;
-        obj.runtime_ref = go;
-
-    }
-
     private void LinkChildren()
     {
         foreach (Chunk chunk in chunk_data.chunks)
         {
-            foreach (Obj obj in chunk.objects)
+            foreach (Obj obj in chunk.GetObjects())
             {
                 if (obj.obj_parent == "World Objects")
                 {
@@ -519,31 +392,6 @@ public class ChunkManager : MonoBehaviour
                     }
                 }
             }
-
-            foreach (Entity ent in chunk.entities)
-            {
-                if (ent.obj_parent == "World Entities")
-                {
-                    ent.runtime_ref.transform.parent = GameObject.Find("World Entities").transform;
-                }
-                else
-                {
-                    foreach (Obj other_obj in pending_childs)
-                    {
-                        if (ent.obj_parent == other_obj.name)
-                        {
-                            foreach (string name in other_obj.child_names)
-                            {
-                                if (name == ent.name)
-                                {
-                                    ent.runtime_ref.transform.parent = other_obj.runtime_ref.transform;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 
@@ -555,15 +403,14 @@ public class ChunkManager : MonoBehaviour
     public void RefreshChunkObjects(Chunk chunk)
     {
         //ThreadManager.StartThreadedFunction(() => { FindWorldObjects(wo, eh); });
-        FindWorldObjects();
 
-        foreach (GameObject go in world_objects)
+        foreach (KeyValuePair<GameObject, ObjectTypes> wo in FindWorldObjects())
         {
-            if (chunk.chunk_bounds.Contains(go.transform.position))
+            if (chunk.chunk_bounds.Contains(wo.Key.transform.position))
             {
-                if (!ChunksHaveObject(go))
+                if (!ChunksHaveObject(wo.Key))
                 {
-                    InitialseObj(chunk, go);
+                    chunk.InitialseObj(wo.Value, wo.Key);
                 }
                 else
                 {
@@ -574,16 +421,24 @@ public class ChunkManager : MonoBehaviour
         }
     }
 
-    public void FindWorldObjects()
+    public Dictionary<GameObject, ObjectTypes> FindWorldObjects()
     {
+        Dictionary<GameObject, ObjectTypes> world_objects = new Dictionary<GameObject, ObjectTypes>();
 
-            }
-        
+        GameObject wo = GameObject.FindGameObjectWithTag("World Objects");
+        ExtractChildrenFromObject(world_objects, ObjectTypes.BASIC, wo);
+
+        GameObject we = GameObject.FindGameObjectWithTag("World Entities");
+        ExtractChildrenFromObject(world_objects, ObjectTypes.ENTITY, we);
+
+        return world_objects;
+    }
+
     public bool ChunksHaveObject(GameObject go)
     {
         foreach (Chunk chunk in chunk_data.chunks)
         {
-            foreach (Obj obj in chunk.objects)
+            foreach (Obj obj in chunk.GetObjects())
             {
                 if (obj.runtime_ref == go)
                 {
@@ -594,305 +449,155 @@ public class ChunkManager : MonoBehaviour
         return false;
     }
 
-    public void ExtractChildrenFromObject(Transform p_transform, Transform[] children)
+    public bool HasChunks()
     {
- 
+        return !(chunk_data.chunks == null);
+    }
+
+    public void ClearAllObjects()
     {
-                    world_objects.Add(child.gameObject);
+        foreach (KeyValuePair<GameObject, ObjectTypes> wo in FindWorldObjects())
+        {
+            DestroyImmediate(wo.Key);
         }
     }
-    }
 
+    private void GenerateChunkNeighbours()
     {
-        ic bool HasChunks()
-    }
-
-
-
-    {
+        for (int i = 0; i < chunk_data.chunks.Count; i++)
         {
-            Fin
-        {
-                oreach(GameObject go in world_objects)
-        {
+            Chunk chunk = chunk_data.chunks[i];
 
-                    DestroyImmediate(go);
+            float box_size = chunk_data.chunk_size * 2;
+
+            Bounds box = new Bounds(chunk.chunk_pos, new Vector3(box_size, box_size, box_size));
+
+            foreach (Chunk other_chunk in chunk_data.chunks)
+            {
+                if (box.Intersects(other_chunk.chunk_bounds) && chunk.chunk_ID != other_chunk.chunk_ID)
+                {
+                    chunk.chunk_neighbours.Add(other_chunk.chunk_ID);
                 }
             }
+        }
+    }
 
+    public void ExtractChildrenFromObject(Dictionary<GameObject, ObjectTypes> world_objects, ObjectTypes type, GameObject parent)
+    {
+        for (int i = 0; i < parent.transform.childCount; i++)
+        {
+            Transform obj = parent.transform.GetChild(i);
+
+            world_objects.Add(obj.gameObject, type);
+
+            if (obj.childCount > 0)
             {
+                Transform[] children = obj.GetComponentsInChildren<Transform>();
 
-
-
-
-
-
-
+                foreach (Transform child in children)
                 {
-
-                    {
-                        {
-                        }
-                    }
-                                    }
+                    ExtractChildrenFromObject(world_objects, type, child.gameObject);
+                }
+            }
+        }
     }
 
     public void UpdateDirectories()
     {
         string world_data_directory = Application.dataPath + "/Resources/World Data";
 
-    {
-
-                    FileUtil.DeleteFileOrDirectory(world_data_directory + "/Chunks");
+        if (Directory.Exists(world_data_directory))
+        {
+            FileUtil.DeleteFileOrDirectory(world_data_directory + "/Chunks");
 
             if (!Directory.Exists(world_data_directory + "/Materials"))
-         
             {
-
+                Directory.CreateDirectory(world_data_directory + "/Materials");
+            }
 
             if (!Directory.Exists(world_data_directory + "/Meshes"))
-
-                        Directory.CreateDirectory(world_data_directory + "/Meshes");
+            {
+                Directory.CreateDirectory(world_data_directory + "/Meshes");
             }
-            Asset
-
-
-                {
-            }
-            Directory.CreateDirector
-}
+            AssetDatabase.Refresh();
+        }
         else
         {
-
-
             Directory.CreateDirectory(world_data_directory);
-
+            Directory.CreateDirectory(world_data_directory + "/Chunks");
 
             if (!Directory.Exists(world_data_directory + "/Materials"))
             {
-                {
-                    Directory.CreateDirectory(world_data_directory + "/Materials");
-                }
+                Directory.CreateDirectory(world_data_directory + "/Materials");
+            }
 
-
-                !Directory.Exists(world_data_directory + "/Meshes"))
-
-                Directory.CreateDirectory(world_data_directory + "/Meshes");
-Component<MeshFilter>().sharedMesh;
-
-        foreach (Material mat in mats)
-        {
-            obj.obj_mats.Add(mat.name);
-        }
-
-        obj.obj_mesh = sm.name;
-
-        string m_path = "Assets/Resources/World Data/";
-
-     
-        {
-        }
-
-
-
-
-
-        //Meshes
-        //Meshes
-        {
+            if (!Directory.Exists(world_data_directory + "/Meshes"))
             {
-                {
-                    {
-
-
-                        {
-                            // print(status);
-                                                    }
-
-
-                            {
-                                {
-                                    {
-                                        {
-                                            break;
-                                                                obj.primitive_type = PrimitiveType.Capsule;
-                                break;
-                         
-                                            {
-                                                break;
-                                            }
-                                        }
-                                        {
-                                            {
-                                                break;
-                                            }
-                                        }
-                                        {
-                                            {
-                                                break;
-                                                                        obj.primitive_type = PrimitiveType.Quad;
-                                break;
-                         
-                                                {
-                                                    break;
-                                                                                obj.primitive_type = PrimitiveType.Cube;
-                                break;
-                         
-                                                    {
-                                                        break;
-                                                    }
-                                                }
-                                                
-        //Materials
-        if
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            //Materials
-                            {
-
-                                {
-                                    //Debug.Log("Moving Asset");
-                                    //Debug.Log("Moving Asset");
-                                    {
-                                        {
-                                            //Debug.Log(status);
-                                        }
-                                    }
-                                }
-
-
-                                {
-
-                                }
-
-
-                                                        
-                                                        {
-                            }
-
-                                                                        obj.obj_
-                            {
-                                                        }
-                                                    
-
-                                                                
-                                {
-                                    {
-                                                                   
-                                        {
-                                        }
-                                                                                    {
-                obj.child_names.Add(child.name);
+                Directory.CreateDirectory(world_data_directory + "/Meshes");
             }
         }
+    }
 
-                                                        if (go.GetComponent<MeshRenderer>() != null)
+    public ChunkData GetChunks()
+    {
+        return chunk_data;
+    }
+
+    public Chunk GetCurrentChunk()
+    {
+        return chunk_data.current_chunk;
+    }
+
+    public void SetCurrentChunk(Chunk chunk)
+    {
+        chunk_data.current_chunk = chunk;
+    }
+
+    public Chunk GetChunk(int chunk_id)
+    {
+        foreach (Chunk chunk in chunk_data.chunks)
         {
-            SaveObjectData(obj, go);
+            if (chunk.chunk_ID == chunk_id)
+            {
+                return chunk;
+            }
         }
+        return new Chunk();
+    }
 
-                                {
-                                                
-                                    {
-                                    }
-                                }
-                            }
-                        }
+    public Chunk GetChunkAtLoc(Vector3 pos)
+    {
+        foreach (Chunk chunk in chunk_data.chunks)
+        {
+            if (chunk.chunk_bounds.Contains(pos))
+            {
+                return chunk;
+            }
+        }
+        Debug.LogError("This Location: " + pos + " does not reside in any chunk");
+        return null;
+    }
 
+    private void OnDrawGizmos()
+    {
+        if (HasChunks())
+        {
+            float chunk_size = chunk_data.chunk_size;
+            foreach (Chunk chunk in chunk_data.chunks)
+            {
+                Gizmos.color = Color.white;
+                Gizmos.DrawWireCube(chunk.chunk_pos, new Vector3(chunk_size, 100, chunk_size));
 
-                                        
-                        {
+                Gizmos.color = Color.yellow;
+                Gizmos.DrawWireCube(chunk.chunk_pos, new Vector3(chunk_size / 3, chunk_size, chunk_size / 3));
+            }
+        }
+    }
 
+    // Update is called once per frame
+    void Update()
+    {
 
-                        }
-
-
-                                              
-
-                                              
-                                            obj.ob
-                                                         
-
-
-
-                                             
-                        {
-                                                }
-                            {
-                                                        
-                                                
-                                                    
-                            
-                                    TITY;
-                            }
-                            {
-                                                            {
-                                                   
-                            }
-        else
-                            {
-                                                            {
-                                return;
-
-                            }
-
-                        
-                            {
-                                {
-
-                                }
-
-
-                                {
-
-                                }
-
-
-                                {
-
-                                }
-
-
-                                {
-                                    {
-                                        {
-                                            {
-                                                {
-                                                }
-                                            }
-                                        }
-
-                                    }
-
-
-                                    {
-                                        {
-                                            {
-                                                {
-                                                    {
-                                                                     
-                                                    }
-                                                }
-                                                                                            }
-
-                                            }
-
-
-                                            {
-                                                {
-                                                    {
-                                                                                                  
-                                                        {
-                                                            {
-                                                                                               
-                                                        
-
-
-                                                        
-                                                            }
-                                                
+    }
+    #endregion
+}
