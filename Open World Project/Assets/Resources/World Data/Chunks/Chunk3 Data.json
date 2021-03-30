@@ -5,42 +5,7 @@
         "z": -23.933334350585939
     },
     "chunk_ID": 3,
-    "basic_objects": [
-        {
-            "basic_object": {
-                "obj_type": 0,
-                "runtime_ref": {
-                    "instanceID": -20246
-                },
-                "obj_parent": "Test Objects",
-                "child_names": [],
-                "name": "Mushroom_02",
-                "obj_position": {
-                    "x": 10.82335090637207,
-                    "y": 0.0,
-                    "z": -17.874696731567384
-                },
-                "obj_rotation": {
-                    "x": 0.0,
-                    "y": 0.0,
-                    "z": 0.0,
-                    "w": 1.0
-                },
-                "obj_scale": {
-                    "x": 10.0,
-                    "y": 10.0,
-                    "z": 10.0
-                },
-                "is_unity_primitive": false,
-                "primitive_type": 0,
-                "obj_mesh": "Mushroom_02",
-                "obj_mats": [
-                    "SimpleNaturePack_Texture_01"
-                ],
-                "collider_type": "UnityEngine.MeshCollider"
-            }
-        }
-    ],
+    "basic_objects": [],
     "entity_objects": [],
     "chunk_bounds": {
         "m_Center": {
@@ -53,9 +18,6 @@
             "y":Infinity,
             "z": 6.666666507720947
         }
-    },
-    "chunk_collider": {
-        "instanceID": 0
     },
     "chunk_neighbours": [
         2,

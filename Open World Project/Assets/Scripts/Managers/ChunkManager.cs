@@ -60,9 +60,11 @@ public class ChunkManager : MonoBehaviour
         {
             LoadChunk(spawn_chunk);
 
-            foreach (int neighbor in spawn_chunk.chunk_neighbours)
+            foreach (int neighbor_id in spawn_chunk.chunk_neighbours)
             {
-                LoadChunk(GetChunkFromFile(neighbor));
+                Chunk chunk = GetChunkFromFile(neighbor_id);
+                Debug.Log("Loading Chunk " + chunk.chunk_ID);
+                LoadChunk(chunk);
             }
         }
         else
@@ -93,19 +95,18 @@ public class ChunkManager : MonoBehaviour
                 }
             }
         }
-
-        LinkChildren();
         SetCurrentChunk(spawn_chunk);
+        LinkChildren();
     }
 
     //Instantiate a Chunk in the world
     public void LoadChunk(Chunk chunk)
     {
-        Debug.Log(chunk.chunk_ID + chunk.GetObjects().Count);
-
         foreach (Obj obj in chunk.GetObjects())
         {
             obj.SpawnObject();
+
+            Debug.Log(obj.runtime_ref.name);
 
             if (obj.obj_parent != null)
             {
@@ -366,33 +367,31 @@ public class ChunkManager : MonoBehaviour
 
     private void LinkChildren()
     {
-        foreach (Chunk chunk in chunk_data.chunks)
+        foreach (Obj obj in pending_childs)
         {
-            foreach (Obj obj in chunk.GetObjects())
+            if (obj.obj_parent == "World Objects")
             {
-                if (obj.obj_parent == "World Objects")
+                obj.runtime_ref.transform.parent = GameObject.Find("World Objects").transform;
+            }
+            else
+            {
+                foreach (Obj other_obj in pending_childs)
                 {
-                    obj.runtime_ref.transform.parent = GameObject.Find("World Objects").transform;
-                }
-                else
-                {
-                    foreach (Obj other_obj in pending_childs)
+                    if (obj.obj_parent == other_obj.name)
                     {
-                        if (obj.obj_parent == other_obj.name)
+                        foreach (string name in other_obj.child_names)
                         {
-                            foreach (string name in other_obj.child_names)
+                            if (name == obj.name)
                             {
-                                if (name == obj.name)
-                                {
-                                    obj.runtime_ref.transform.parent = other_obj.runtime_ref.transform;
-                                    break;
-                                }
+                                obj.runtime_ref.transform.parent = other_obj.runtime_ref.transform;
+                                break;
                             }
                         }
                     }
                 }
             }
         }
+        pending_childs.Clear();
     }
 
     public bool IsDirectoryEmpty(string path)
@@ -416,7 +415,6 @@ public class ChunkManager : MonoBehaviour
                 {
                     continue;
                 }
-
             }
         }
     }
@@ -424,9 +422,10 @@ public class ChunkManager : MonoBehaviour
     public Dictionary<GameObject, ObjectTypes> FindWorldObjects()
     {
         Dictionary<GameObject, ObjectTypes> world_objects = new Dictionary<GameObject, ObjectTypes>();
-
+        pending_childs = new List<Obj>(); 
+ 
         GameObject wo = GameObject.FindGameObjectWithTag("World Objects");
-        ExtractChildrenFromObject(world_objects, ObjectTypes.BASIC, wo);
+        ExtractChildrenFromObject(world_objects, ObjectTypes.BASIC, wo); 
 
         GameObject we = GameObject.FindGameObjectWithTag("World Entities");
         ExtractChildrenFromObject(world_objects, ObjectTypes.ENTITY, we);

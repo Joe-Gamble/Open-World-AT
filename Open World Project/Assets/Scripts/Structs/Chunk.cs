@@ -15,7 +15,6 @@ public class Chunk
     public List<Entity> entity_objects;
 
     public Bounds chunk_bounds;
-    public BoxCollider chunk_collider;
     public List<int> chunk_neighbours;
 
     public List<Obj> GetObjects()
@@ -24,7 +23,6 @@ public class Chunk
 
         foreach (Basic bas in basic_objects)
         {
-            Debug.Log(basic_objects.Count);
             objs.Add(bas.basic_object);
         }
 

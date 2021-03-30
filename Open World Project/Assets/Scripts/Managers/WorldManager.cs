@@ -52,7 +52,6 @@ public class WorldManager : MonoBehaviour
     void Start()
     {
         Initialise();
-        chunkManager.ClearAllObjects();
     }
 
     public void Initialise()
@@ -64,15 +63,7 @@ public class WorldManager : MonoBehaviour
         chunkManager.InitialiseSpawnChunks(spawn_chunk);
         lighting_manager.LoadLightingPresets();
 
-        ExtractFromScripts();
-
         player.transform.position = chunkManager.GetChunk(spawn_chunk).chunk_pos;
-    }
-
-    void ExtractFromScripts()
-    {
-        chunkManager.GetChunks();
-        //data.lighting_presets = lighting_manager.GetPresets();
     }
 
     // Update is called once per frame
@@ -190,9 +181,9 @@ public class WorldManagerEditor : EditorWindow
             chunk_manager.LoadChunksFromDisk();
         }
 
-        if (GUILayout.Button("Test Threading Functionality"))
+        if (GUILayout.Button("Remove Objects from World"))
         {
-            chunk_manager.RefreshChunkObjects(chunk_manager.GetChunk(6));
+            chunk_manager.ClearAllObjects();
         }
 
 
