@@ -13,17 +13,17 @@ using System.Threading.Tasks;
 --More chunk functionality to save objects/chunks?
 */
 
-[ExecuteInEditMode]
 public class ChunkManager : MonoBehaviour
 {
-    ChunkData chunk_data;
+    private ChunkData chunk_data;
 
     public GameObject testPlane;
 
     private float length;
     public int divides = 3;
 
-    private List<Obj> pending_childs = new List<Obj>();
+    public List<Obj> pending_childs = new List<Obj>();
+    private static Dictionary<GameObject, ObjectTypes> world_objects = new Dictionary<GameObject, ObjectTypes>();
 
     void Start()
     {
@@ -56,15 +56,16 @@ public class ChunkManager : MonoBehaviour
     //Logic to Load/Unlod the correct chunks on entering a new one
     public void EnterNewChunk(bool spawning, Chunk spawn_chunk)
     {
+        FindWorldObjects();
+
         if (spawning)
         {
-            LoadChunk(spawn_chunk);
+            spawn_chunk.Load(this);
 
             foreach (int neighbor_id in spawn_chunk.chunk_neighbours)
             {
                 Chunk chunk = GetChunkFromFile(neighbor_id);
-                Debug.Log("Loading Chunk " + chunk.chunk_ID);
-                LoadChunk(chunk);
+                chunk.Load(this);
             }
         }
         else
@@ -83,7 +84,7 @@ public class ChunkManager : MonoBehaviour
                 }
                 else
                 {
-                    UnloadChunk(GetChunk(old_chunk_id));
+                    GetChunk(old_chunk_id).Unload(this);
                 }
             }
 
@@ -91,50 +92,12 @@ public class ChunkManager : MonoBehaviour
             {
                 if (!needed_neighbours.Contains(new_chunk_neighbor_id))
                 {
-                    LoadChunk(GetChunkFromFile(new_chunk_neighbor_id));
+                    GetChunkFromFile(new_chunk_neighbor_id).Load(this);
                 }
             }
         }
         SetCurrentChunk(spawn_chunk);
         LinkChildren();
-    }
-
-    //Instantiate a Chunk in the world
-    public void LoadChunk(Chunk chunk)
-    {
-        foreach (Obj obj in chunk.GetObjects())
-        {
-            obj.SpawnObject();
-
-            Debug.Log(obj.runtime_ref.name);
-
-            if (obj.obj_parent != null)
-            {
-                pending_childs.Add(obj);
-            }
-        }
-        chunk_data.chunks.Add(chunk);
-    }
-
-
-    //Destroy a Chunk in the world
-    public void UnloadChunk(Chunk chunk)
-    {
-        RefreshChunkObjects(chunk);
-
-        if (chunk.GetObjects().Count > 0)
-        {
-            Debug.Log("Chunk " + chunk.chunk_ID + "has " + chunk.GetObjects().Count + "objects");
-
-            chunk.OverrideData();
-
-            foreach (Obj obj in chunk.GetObjects())
-            {
-                Destroy(obj.runtime_ref);
-                obj.runtime_ref = null;
-            }
-        }
-        chunk_data.chunks.Remove(chunk);
     }
 
     #endregion
@@ -205,14 +168,15 @@ public class ChunkManager : MonoBehaviour
 
     public void CollectData()
     {
+        FindWorldObjects();
 
-        foreach (KeyValuePair<GameObject, ObjectTypes> wo in FindWorldObjects())
+        foreach (KeyValuePair<GameObject, ObjectTypes> wo in world_objects)
         {
             GetChunkAtLoc(wo.Key.transform.position).InitialseObj(wo.Value, wo.Key);
         }
 
-        ClearAllObjects();
         SaveAllChunkData();
+        ClearAllObjects();
     }
 
     public void LoadChunksFromDisk()
@@ -232,7 +196,7 @@ public class ChunkManager : MonoBehaviour
 
             foreach (FileInfo fo in assetsInfo)
             {
-                LoadChunk(GetChunkFromFile(i));
+                GetChunkFromFile(i).Load(this);
                 i++;
             }
             LinkChildren();
@@ -250,6 +214,7 @@ public class ChunkManager : MonoBehaviour
         {
             chunk.OverrideData();
         }
+        AssetDatabase.Refresh();
     }
     #endregion
 
@@ -365,6 +330,12 @@ public class ChunkManager : MonoBehaviour
 
     #region HelperFunctions
 
+    public void DeleteObject(Obj obj)
+    {
+        Destroy(obj.runtime_ref);
+        obj.runtime_ref = null;
+    }
+
     private void LinkChildren()
     {
         foreach (Obj obj in pending_childs)
@@ -372,6 +343,10 @@ public class ChunkManager : MonoBehaviour
             if (obj.obj_parent == "World Objects")
             {
                 obj.runtime_ref.transform.parent = GameObject.Find("World Objects").transform;
+            }
+            else if (obj.obj_parent == "World Entities")
+            {
+                obj.runtime_ref.transform.parent = GameObject.Find("World Entities").transform;
             }
             else
             {
@@ -399,53 +374,16 @@ public class ChunkManager : MonoBehaviour
         return !Directory.EnumerateFileSystemEntries(path).Any();
     }
 
-    public void RefreshChunkObjects(Chunk chunk)
+    public void FindWorldObjects()
     {
-        //ThreadManager.StartThreadedFunction(() => { FindWorldObjects(wo, eh); });
+        world_objects = new Dictionary<GameObject, ObjectTypes>();
+        pending_childs = new List<Obj>();
 
-        foreach (KeyValuePair<GameObject, ObjectTypes> wo in FindWorldObjects())
-        {
-            if (chunk.chunk_bounds.Contains(wo.Key.transform.position))
-            {
-                if (!ChunksHaveObject(wo.Key))
-                {
-                    chunk.InitialseObj(wo.Value, wo.Key);
-                }
-                else
-                {
-                    continue;
-                }
-            }
-        }
-    }
-
-    public Dictionary<GameObject, ObjectTypes> FindWorldObjects()
-    {
-        Dictionary<GameObject, ObjectTypes> world_objects = new Dictionary<GameObject, ObjectTypes>();
-        pending_childs = new List<Obj>(); 
- 
         GameObject wo = GameObject.FindGameObjectWithTag("World Objects");
-        ExtractChildrenFromObject(world_objects, ObjectTypes.BASIC, wo); 
+        ExtractChildrenFromObject(world_objects, ObjectTypes.BASIC, wo);
 
         GameObject we = GameObject.FindGameObjectWithTag("World Entities");
         ExtractChildrenFromObject(world_objects, ObjectTypes.ENTITY, we);
-
-        return world_objects;
-    }
-
-    public bool ChunksHaveObject(GameObject go)
-    {
-        foreach (Chunk chunk in chunk_data.chunks)
-        {
-            foreach (Obj obj in chunk.GetObjects())
-            {
-                if (obj.runtime_ref == go)
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     public bool HasChunks()
@@ -455,7 +393,8 @@ public class ChunkManager : MonoBehaviour
 
     public void ClearAllObjects()
     {
-        foreach (KeyValuePair<GameObject, ObjectTypes> wo in FindWorldObjects())
+        FindWorldObjects();
+        foreach (KeyValuePair<GameObject, ObjectTypes> wo in world_objects)
         {
             DestroyImmediate(wo.Key);
         }
@@ -487,15 +426,18 @@ public class ChunkManager : MonoBehaviour
         {
             Transform obj = parent.transform.GetChild(i);
 
-            world_objects.Add(obj.gameObject, type);
-
-            if (obj.childCount > 0)
+            if (!world_objects.ContainsKey(obj.gameObject))
             {
-                Transform[] children = obj.GetComponentsInChildren<Transform>();
+                world_objects.Add(obj.gameObject, type);
 
-                foreach (Transform child in children)
+                if (obj.childCount > 0)
                 {
-                    ExtractChildrenFromObject(world_objects, type, child.gameObject);
+                    Transform[] children = obj.GetComponentsInChildren<Transform>();
+
+                    foreach (Transform child in children)
+                    {
+                        ExtractChildrenFromObject(world_objects, type, child.gameObject);
+                    }
                 }
             }
         }
@@ -575,6 +517,11 @@ public class ChunkManager : MonoBehaviour
         }
         Debug.LogError("This Location: " + pos + " does not reside in any chunk");
         return null;
+    }
+
+    public static Dictionary<GameObject, ObjectTypes> GetWorldObjects()
+    {
+        return world_objects;
     }
 
     private void OnDrawGizmos()

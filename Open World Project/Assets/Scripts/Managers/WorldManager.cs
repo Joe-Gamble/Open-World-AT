@@ -31,7 +31,6 @@ namespace World
     }
 }
 
-[ExecuteInEditMode]
 public class WorldManager : MonoBehaviour
 {
     private ChunkManager chunkManager;

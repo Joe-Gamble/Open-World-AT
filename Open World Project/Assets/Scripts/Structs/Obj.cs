@@ -35,21 +35,30 @@ public class Obj
 
     public void SaveObjectData(GameObject go)
     {
-        obj_mats = new List<string>();
-
-        if (go.TryGetComponent(out MeshRenderer mr))
+        if (go.TryGetComponent(out Renderer r))
         {
-            Material[] mats = mr.sharedMaterials;
-            Mesh sm = go.GetComponent<MeshFilter>().sharedMesh;
+            string m_path = "Assets/Resources/World Data/";
 
-            foreach (Material mat in mats)
+            obj_mats = new List<string>();
+
+            Mesh sm = new Mesh();
+
+            if (r.GetType().ToString() == "UnityEngine.MeshRenderer")
             {
-                obj_mats.Add(mat.name);
+                MeshRenderer mr = go.GetComponent<MeshRenderer>();
+                sm = go.GetComponent<MeshFilter>().sharedMesh;
+                obj_mesh = sm.name;
+                SaveMats(m_path, mr.sharedMaterials);
+            }
+            else if (r.GetType().ToString() == "UnityEngine.SkinnedMeshRenderer")
+            {
+                SkinnedMeshRenderer smr = go.GetComponent<SkinnedMeshRenderer>();
+                sm = smr.sharedMesh;
+                obj_mesh = sm.name;
+                SaveMats(m_path, smr.materials);
             }
 
-            obj_mesh = sm.name;
 
-            string m_path = "Assets/Resources/World Data/";
 
             //Meshes
             if (obj_mesh != null)
@@ -105,20 +114,6 @@ public class Obj
                 }
             }
 
-            //Materials
-            if (obj_mats.Count > 0)
-            {
-                foreach (Material mat in mats)
-                {
-                    //Debug.Log("Moving Asset");
-                    if (Resources.Load("World Data/Materials/" + mat) == null)
-                    {
-                        string status = AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(mat), m_path + "Materials/" + mat.name + ".mat");
-                        //Debug.Log(status);
-                    }
-                }
-            }
-
             if (go.TryGetComponent(out Collider col))
             {
                 collider_type = col.GetType().ToString();
@@ -126,6 +121,25 @@ public class Obj
 
             AssetDatabase.Refresh();
             AssetDatabase.SaveAssets();
+        }
+    }
+
+    private void SaveMats(string m_path, Material[] mats)
+    {
+        if (mats.Length > 0)
+        {
+            foreach (Material mat in mats)
+            {
+                Debug.Log(mat.name);
+                obj_mats.Add(mat.name);
+
+                //Debug.Log("Moving Asset");
+                if (Resources.Load("World Data/Materials/" + mat) == null)
+                {
+                    string status = AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(mat), m_path + "Materials/" + mat.name + ".mat");
+                    //Debug.Log(status);
+                }
+            }
         }
     }
 
@@ -272,34 +286,28 @@ public class Entity
     public Obj entity_object;
 
     public NavMeshAgent ent_agent;
+    public Animator ent_animator;
     public int health;
 
     public Entity(GameObject go)
     {
         entity_object = new Obj();
         entity_object.Initialse(go);
+
+        SaveEntityData(go);
     }
-    /*
-    public Entity(Obj obj)
+
+    private void SaveEntityData(GameObject go)
     {
-        obj_type = ObjectTypes.ENTITY;
-        runtime_ref = obj.runtime_ref;
+        if (go.TryGetComponent(out NavMeshAgent agent))
+        {
+            ent_agent = agent;
+        }
 
-        obj_parent = obj.obj_parent;
-        child_names = obj.child_names;
-
-        name = obj.name;
-
-        obj_position = obj.obj_position;
-        obj_rotation = obj.obj_rotation;
-        obj_scale = obj.obj_scale;
-
-        is_unity_primitive = obj.is_unity_primitive;
-        primitive_type = obj.primitive_type;
-
-        obj_mesh = obj.obj_mesh;
-        obj_mats = obj.obj_mats;
-        collider_type = obj.collider_type;
+        if (go.TryGetComponent(out Animator animator))
+        {
+            ent_animator = animator;
+        }
     }
-    */
+
 }

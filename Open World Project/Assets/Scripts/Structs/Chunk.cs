@@ -17,6 +17,69 @@ public class Chunk
     public Bounds chunk_bounds;
     public List<int> chunk_neighbours;
 
+    //Instantiate a Chunk in the world
+    public void Load(ChunkManager cm)
+    {
+        foreach (Obj obj in GetObjects())
+        {
+            obj.SpawnObject();
+
+            if (obj.obj_parent != null)
+            {
+                cm.pending_childs.Add(obj);
+            }
+        }
+        cm.GetChunks().chunks.Add(this);
+    }
+
+    //Destroy a Chunk in the world
+    public void Unload(ChunkManager cm)
+    {
+        RefreshChunkObjects(ChunkManager.GetWorldObjects());
+        if (GetObjects().Count > 0)
+        {
+            OverrideData();
+
+            foreach (Obj obj in GetObjects())
+            {
+                cm.DeleteObject(obj);
+            }
+        }
+        cm.GetChunks().chunks.Remove(this);
+    }
+
+    public void RefreshChunkObjects(Dictionary<GameObject, ObjectTypes> world_objects)
+    {
+        //ThreadManager.StartThreadedFunction(() => { FindWorldObjects(wo, eh); });
+
+        foreach (KeyValuePair<GameObject, ObjectTypes> wo in world_objects)
+        {
+            if (chunk_bounds.Contains(wo.Key.transform.position))
+            {
+                if (!ChunksHaveObject(wo.Key))
+                {
+                    InitialseObj(wo.Value, wo.Key);
+                }
+                else
+                {
+                    continue;
+                }
+            }
+        }
+    }
+
+    public bool ChunksHaveObject(GameObject go)
+    {
+        foreach (Obj obj in GetObjects())
+        {
+            if (obj.runtime_ref == go)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public List<Obj> GetObjects()
     {
         List<Obj> objs = new List<Obj>();
@@ -38,13 +101,9 @@ public class Chunk
     {
         string path = Application.dataPath + "/Resources/World Data/Chunks/Chunk" + chunk_ID + " Data.json";
 
-        Debug.Log(this.basic_objects.Count);
-
         string json = JsonUtility.ToJson(this);
 
         File.WriteAllText(path, json);
-
-        AssetDatabase.Refresh();
     }
 
     public void InitialseObj(ObjectTypes type, GameObject go)
