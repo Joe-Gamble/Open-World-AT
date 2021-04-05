@@ -11,16 +11,61 @@ public enum ObjectTypes
     ENTITY
 }
 
+public static class ObjManager
+{
+    public enum StaticObjects
+    {
+        WORLD_OBJECTS = 0,
+        WORLD_ENTITIES = 1
+    }
+
+    static int obj_index = 2;
+
+    public static List<Basic> objs = new List<Basic>();
+
+    public static void AddObject(Basic obj, bool is_new)
+    {
+        if (is_new)
+        {
+            obj.obj_data.obj_id = obj_index;
+            obj_index += 1;
+        }
+        objs.Add(obj);
+    }
+
+    public static Basic FindObject(string name)
+    {
+        foreach (Basic obj in objs)
+        {
+            if (obj.obj_data.name == name)
+            {
+                return obj;
+            }
+        }
+        return null;
+    }
+
+    public static Basic FindObject(int id)
+    {
+        foreach (Basic obj in objs)
+        {
+            if (obj.obj_data.obj_id == id)
+            {
+                return obj;
+            }
+        }
+        return null;
+    }
+}
+
 [Serializable]
 public class Obj
 {
+    public string name;
+    public int obj_id = -1;
+
     public ObjectTypes obj_type = ObjectTypes.BASIC;
     public GameObject runtime_ref;
-
-    public string obj_parent = null;
-    public List<string> child_names = null;
-
-    public string name;
 
     public Vector3 obj_position;
     public Quaternion obj_rotation;
@@ -30,6 +75,7 @@ public class Obj
     public PrimitiveType primitive_type;
 
     public string obj_mesh;
+    public string renderer_type;
     public List<string> obj_mats;
     public string collider_type;
 
@@ -43,19 +89,21 @@ public class Obj
 
             Mesh sm = new Mesh();
 
-            if (r.GetType().ToString() == "UnityEngine.MeshRenderer")
+            renderer_type = r.GetType().ToString();
+
+            if (renderer_type == "UnityEngine.MeshRenderer")
             {
                 MeshRenderer mr = go.GetComponent<MeshRenderer>();
                 sm = go.GetComponent<MeshFilter>().sharedMesh;
                 obj_mesh = sm.name;
                 SaveMats(m_path, mr.sharedMaterials);
             }
-            else if (r.GetType().ToString() == "UnityEngine.SkinnedMeshRenderer")
+            else if (renderer_type == "UnityEngine.SkinnedMeshRenderer")
             {
                 SkinnedMeshRenderer smr = go.GetComponent<SkinnedMeshRenderer>();
                 sm = smr.sharedMesh;
                 obj_mesh = sm.name;
-                SaveMats(m_path, smr.materials);
+                SaveMats(m_path, smr.sharedMaterials);
             }
 
 
@@ -130,10 +178,8 @@ public class Obj
         {
             foreach (Material mat in mats)
             {
-                Debug.Log(mat.name);
                 obj_mats.Add(mat.name);
 
-                //Debug.Log("Moving Asset");
                 if (Resources.Load("World Data/Materials/" + mat) == null)
                 {
                     string status = AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(mat), m_path + "Materials/" + mat.name + ".mat");
@@ -143,33 +189,15 @@ public class Obj
         }
     }
 
-    public void Initialse(GameObject go)
+    public void Initialise(Basic obj, GameObject go)
     {
-        if (go.transform.parent != null)
-        {
-            if (obj_parent == null)
-            {
-                obj_parent = go.transform.parent.name;
-            }
-        }
-
-        if (go.transform.childCount > 0)
-        {
-            child_names = new List<string>();
-
-            Transform[] children = go.GetComponentsInChildren<Transform>();
-
-            foreach (Transform child in children)
-            {
-                child_names.Add(child.name);
-            }
-        }
+        ObjManager.AddObject(obj, true);
 
         SaveObjectData(go);
 
         Transform trans = go.GetComponent<Transform>();
 
-        name = trans.name;
+        name = go.name;
 
         obj_position = trans.position;
         obj_rotation = trans.rotation;
@@ -183,14 +211,28 @@ public class Obj
         GameObject go;
         List<Material> mats = new List<Material>();
 
+        if (obj_mats != null)
+        {
+            foreach (string mat_name in obj_mats)
+            {
+                if (mat_name != "Default-Material")
+                {
+                    Material m = Resources.Load("World Data/Materials/" + mat_name, typeof(Material)) as Material;
+                    mats.Add(m);
+                }
+            }
+        }
+
         //Unity Primitive
         if (is_unity_primitive)
         {
             go = GameObject.CreatePrimitive(primitive_type);
 
-            Material default_mat = go.GetComponent<MeshRenderer>().sharedMaterial;
+            MeshRenderer mr = go.GetComponent<MeshRenderer>();
 
-            if (obj_mats != null)
+            Material default_mat = mr.sharedMaterial;
+
+            if (obj_mats.Count > 0)
             {
                 foreach (string mat_name in obj_mats)
                 {
@@ -198,11 +240,8 @@ public class Obj
                     {
                         mats.Add(default_mat);
                     }
-                    else
-                    {
-                        mats.Add(Resources.Load("World Data/Materials/" + mat_name, typeof(Material)) as Material);
-                    }
                 }
+                mr.sharedMaterials = mats.ToArray();
             }
         }
 
@@ -213,24 +252,17 @@ public class Obj
 
             if (obj_mesh != "")
             {
-                go.AddComponent<MeshFilter>().sharedMesh = Resources.Load<Mesh>("World Data/Meshes/" + obj_mesh);
-                go.AddComponent<MeshRenderer>();
-            }
-
-            if (obj_mats != null)
-            {
-                foreach (string mat_name in obj_mats)
+                if (renderer_type == "UnityEngine.MeshRenderer")
                 {
-                    mats.Add(Resources.Load("World Data/Materials/" + mat_name, typeof(Material)) as Material);
+                    MeshRenderer mr = go.AddComponent<MeshRenderer>();
+                    go.AddComponent<MeshFilter>().sharedMesh = Resources.Load<Mesh>("World Data/Meshes/" + obj_mesh);
+                    mr.sharedMaterials = mats.ToArray();
+                }
+                else if (renderer_type == "UnityEngine.SkinnedMeshRenderer")
+                {
+                    //chunk.skinned_mesh_objects.Add(this);
                 }
             }
-        }
-
-        go.TryGetComponent(out MeshRenderer mr);
-
-        if (mr != null)
-        {
-            mr.sharedMaterials = mats.ToArray();
         }
 
         if (collider_type != "")
@@ -269,45 +301,33 @@ public class Obj
     }
 }
 
+
 [Serializable]
 public class Basic
 {
-    public Obj basic_object;
-    public Basic(GameObject go)
+    public Obj obj_data;
+
+    public int obj_parent = -1;
+    public List<int> obj_children = null;
+
+    public Basic(Chunk chunk, GameObject go)
     {
-        basic_object = new Obj();
-        basic_object.Initialse(go);
-    }
-}
+        obj_data = new Obj();
+        obj_data.Initialise(this, go);
 
-[Serializable]
-public class Entity
-{
-    public Obj entity_object;
-
-    public NavMeshAgent ent_agent;
-    public Animator ent_animator;
-    public int health;
-
-    public Entity(GameObject go)
-    {
-        entity_object = new Obj();
-        entity_object.Initialse(go);
-
-        SaveEntityData(go);
-    }
-
-    private void SaveEntityData(GameObject go)
-    {
-        if (go.TryGetComponent(out NavMeshAgent agent))
+        if (go.transform.childCount > 0)
         {
-            ent_agent = agent;
+            Transform[] children = go.GetComponentsInChildren<Transform>();
+
+            foreach (Transform child in children)
+            {
+                if (child != go.transform)
+                {
+                    Basic obj = new Basic(ChunkManager.GetChunkAtLoc(child.transform.position), child.gameObject);
+                }
+            }
         }
 
-        if (go.TryGetComponent(out Animator animator))
-        {
-            ent_animator = animator;
-        }
+        chunk.basic_objects.Add(this);
     }
-
 }

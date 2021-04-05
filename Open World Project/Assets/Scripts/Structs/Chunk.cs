@@ -12,7 +12,7 @@ public class Chunk
     public int chunk_ID;
 
     public List<Basic> basic_objects;
-    public List<Entity> entity_objects;
+    public List<string> entity_references;
 
     public Bounds chunk_bounds;
     public List<int> chunk_neighbours;
@@ -20,32 +20,36 @@ public class Chunk
     //Instantiate a Chunk in the world
     public void Load(ChunkManager cm)
     {
-        foreach (Obj obj in GetObjects())
+        foreach (Basic basic in basic_objects)
         {
-            obj.SpawnObject();
+            ObjManager.AddObject(basic, false);
 
-            if (obj.obj_parent != null)
-            {
-                cm.pending_childs.Add(obj);
-            }
+            Obj obj = basic.obj_data;
+            obj.SpawnObject();
+            ChunkManager.GetChunks().pending_childs.Add(basic);
         }
-        cm.GetChunks().chunks.Add(this);
+
+        foreach (string ent in entity_references)
+        {
+            EntityManager.SpawnEntity(ent);
+        }
+
+        ChunkManager.GetChunks().chunks.Add(this);
     }
 
     //Destroy a Chunk in the world
     public void Unload(ChunkManager cm)
     {
         RefreshChunkObjects(ChunkManager.GetWorldObjects());
-        if (GetObjects().Count > 0)
-        {
-            OverrideData();
+        OverrideData();
 
-            foreach (Obj obj in GetObjects())
-            {
-                cm.DeleteObject(obj);
-            }
+        foreach (Basic basic in basic_objects)
+        {
+            ObjManager.objs.Remove(basic);
+            cm.DeleteObject(basic.obj_data);
         }
-        cm.GetChunks().chunks.Remove(this);
+
+        ChunkManager.GetChunks().chunks.Remove(this);
     }
 
     public void RefreshChunkObjects(Dictionary<GameObject, ObjectTypes> world_objects)
@@ -86,15 +90,34 @@ public class Chunk
 
         foreach (Basic bas in basic_objects)
         {
-            objs.Add(bas.basic_object);
-        }
-
-        foreach (Entity ent in entity_objects)
-        {
-            objs.Add(ent.entity_object);
+            objs.Add(bas.obj_data);
         }
 
         return objs;
+    }
+
+    public Obj FindObject(string name)
+    {
+        foreach (Obj obj in GetObjects())
+        {
+            if (obj.name == name)
+            {
+                return obj;
+            }
+        }
+        return null;
+    }
+
+    public Obj FindObject(int id)
+    {
+        foreach (Obj obj in GetObjects())
+        {
+            if (obj.obj_id == id)
+            {
+                return obj;
+            }
+        }
+        return null;
     }
 
     public void OverrideData()
@@ -112,14 +135,12 @@ public class Chunk
         {
             case ObjectTypes.BASIC:
                 {
-                    Basic basic = new Basic(go);
-                    basic_objects.Add(basic);
+                    Basic basic = new Basic(this, go);
                     break;
                 }
             case ObjectTypes.ENTITY:
                 {
-                    Entity entity = new Entity(go);
-                    entity_objects.Add(entity);
+                    entity_references.Add(EntityManager.AddEntity(go));
                     break;
                 }
             default:
@@ -132,7 +153,7 @@ public class Chunk
     public void ResetObjects()
     {
         basic_objects = new List<Basic>();
-        entity_objects = new List<Entity>();
+        entity_references = new List<string>();
     }
 }
 
@@ -147,4 +168,6 @@ public struct ChunkData
 
     public string directory;
     public List<Chunk> chunks;
+
+    public List<Basic> pending_childs;
 }

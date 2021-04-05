@@ -120,10 +120,16 @@ public class WorldManagerEditor : EditorWindow
     private ChunkManager chunk_manager;
     private LightingManager lighting_manager;
 
-    private LightingPresets presets;
+    private LightingPresets presets = new LightingPresets();
 
     private void OnEnable()
     {
+        if (presets.presets == null)
+        {
+            presets = new LightingPresets();
+            presets.presets = new List<LightingPreset>();
+        }
+
         if (world_manager_instance == null)
         {
             world_manager_instance = GameObject.FindGameObjectWithTag("GameController");
@@ -220,14 +226,20 @@ public class WorldManagerEditor : EditorWindow
 
         lighting_manager.number_of_presets = EditorGUILayout.IntField("Number of Presets", lighting_manager.number_of_presets);
 
-        for (int i = 0; i < presets.presets.Count; i++)
+        if (presets.presets != null)
         {
-            LightingPreset lp = presets.presets[i];
+            if (presets.presets.Count > 0)
+            {
+                for (int i = 0; i < presets.presets.Count; i++)
+                {
+                    LightingPreset lp = presets.presets[i];
 
-            lp.region = (World.Region)EditorGUILayout.EnumFlagsField("Region", lp.region);
-            lp.ambient_color = EditorGUILayout.GradientField("Ambient Color", lp.ambient_color);
-            lp.directional_color = EditorGUILayout.GradientField("Directional Color", lp.directional_color);
-            lp.fog_color = EditorGUILayout.GradientField("Fog Color", lp.fog_color);
+                    lp.region = (World.Region)EditorGUILayout.EnumFlagsField("Region", lp.region);
+                    lp.ambient_color = EditorGUILayout.GradientField("Ambient Color", lp.ambient_color);
+                    lp.directional_color = EditorGUILayout.GradientField("Directional Color", lp.directional_color);
+                    lp.fog_color = EditorGUILayout.GradientField("Fog Color", lp.fog_color);
+                }
+            }
         }
 
         if (GUILayout.Button("Read Current Colors"))
