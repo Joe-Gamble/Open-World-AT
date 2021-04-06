@@ -33,9 +33,9 @@ public class Entity
         //test
     }
 
-    public Obj[] ExtractChildren(Transform[] bones)
+    public Basic[] ExtractChildren(Transform[] bones)
     {
-        List<Obj> children = new List<Obj>();
+        List<Basic> children = new List<Basic>();
         foreach (Transform bone in bones)
         {
             /*
@@ -52,11 +52,11 @@ public class Entity
 
     public void InitialiseEntity()
     {
-        Transform entity = entity_object.obj_data.runtime_ref.transform;
+        Transform entity = entity_object.runtime_ref.transform;
 
         Transform root_obj = null;
         Transform mesh_object = null;
-        Obj[] bones = null;
+        Basic[] bones = null;
 
         for (int i = 0; i < entity.childCount; i++)
         {
@@ -81,13 +81,13 @@ public class Entity
 
     }
 
-    public void SaveMeshData(Transform _root_object, Obj[] _bones, Transform _mesh_object)
+    public void SaveMeshData(Transform _root_object, Basic[] _bones, Transform _mesh_object)
     {
         mesh_data.bones = new List<int>();
 
         mesh_data.root_name = _root_object.name;
 
-        foreach (Obj bone in _bones)
+        foreach (Basic bone in _bones)
         {
             Debug.Log(_bones.Length);
             Debug.Log(bone.obj_id);
@@ -145,9 +145,9 @@ public static class EntityManager
 
         foreach (Entity ent in collection.entities)
         {
-            if (go.name == ent.entity_object.obj_data.name)
+            if (go.name == ent.entity_object.name)
             {
-                return ent.entity_object.obj_data.name;
+                return ent.entity_object.name;
             }
         }
 
@@ -155,7 +155,7 @@ public static class EntityManager
         collection.entities.Add(new_entity);
         collection.num_entities += 1;
 
-        return new_entity.entity_object.obj_data.name;
+        return new_entity.entity_object.name;
     }
 
     public static void OverrideEntityData()
@@ -168,7 +168,7 @@ public static class EntityManager
     {
         foreach (Entity entity in GetEntityList())
         {
-            if (entity.entity_object.obj_data.name == name)
+            if (entity.entity_object.name == name)
             {
                 /*
                 SkinnedMeshData entity_data = entity.mesh_data;

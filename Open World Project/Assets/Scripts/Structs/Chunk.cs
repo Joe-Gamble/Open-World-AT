@@ -18,15 +18,12 @@ public class Chunk
     public List<int> chunk_neighbours;
 
     //Instantiate a Chunk in the world
-    public void Load(ChunkManager cm)
+    public void Load()
     {
-        foreach (Basic basic in basic_objects)
+        foreach (Basic obj in basic_objects)
         {
-            ObjManager.AddObject(basic, false);
-
-            Obj obj = basic.obj_data;
-            obj.SpawnObject();
-            ChunkManager.GetChunks().pending_childs.Add(basic);
+            obj.Spawn();
+            ObjManager.LoadObject(ChunkManager.GetChunks(), obj);
         }
 
         foreach (string ent in entity_references)
@@ -38,15 +35,14 @@ public class Chunk
     }
 
     //Destroy a Chunk in the world
-    public void Unload(ChunkManager cm)
+    public void Unload()
     {
         RefreshChunkObjects(ChunkManager.GetWorldObjects());
         OverrideData();
 
         foreach (Basic basic in basic_objects)
         {
-            ObjManager.objs.Remove(basic);
-            cm.DeleteObject(basic.obj_data);
+            ChunkManager.DeleteObject(basic);
         }
 
         ChunkManager.GetChunks().chunks.Remove(this);
@@ -74,7 +70,7 @@ public class Chunk
 
     public bool ChunksHaveObject(GameObject go)
     {
-        foreach (Obj obj in GetObjects())
+        foreach (Basic obj in GetObjects())
         {
             if (obj.runtime_ref == go)
             {
@@ -84,40 +80,9 @@ public class Chunk
         return false;
     }
 
-    public List<Obj> GetObjects()
+    public List<Basic> GetObjects()
     {
-        List<Obj> objs = new List<Obj>();
-
-        foreach (Basic bas in basic_objects)
-        {
-            objs.Add(bas.obj_data);
-        }
-
-        return objs;
-    }
-
-    public Obj FindObject(string name)
-    {
-        foreach (Obj obj in GetObjects())
-        {
-            if (obj.name == name)
-            {
-                return obj;
-            }
-        }
-        return null;
-    }
-
-    public Obj FindObject(int id)
-    {
-        foreach (Obj obj in GetObjects())
-        {
-            if (obj.obj_id == id)
-            {
-                return obj;
-            }
-        }
-        return null;
+        return basic_objects;
     }
 
     public void OverrideData()
@@ -170,4 +135,6 @@ public struct ChunkData
     public List<Chunk> chunks;
 
     public List<Basic> pending_childs;
+
+    public List<Basic> world_objects;
 }

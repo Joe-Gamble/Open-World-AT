@@ -44,10 +44,10 @@ public class ChunkManager : MonoBehaviour
 
     public void InitialiseSpawnChunks(int chunk_id)
     {
-        ClearAllObjects();
-
         chunk_data = new ChunkData();
         chunk_data.chunks = new List<Chunk>();
+
+        ClearAllObjects();
 
         EnterNewChunk(true, GetChunkFromFile(chunk_id));
     }
@@ -61,12 +61,12 @@ public class ChunkManager : MonoBehaviour
 
         if (spawning)
         {
-            spawn_chunk.Load(this);
+            spawn_chunk.Load();
 
             foreach (int neighbor_id in spawn_chunk.chunk_neighbours)
             {
                 Chunk chunk = GetChunkFromFile(neighbor_id);
-                chunk.Load(this);
+                chunk.Load();
             }
         }
         else
@@ -85,7 +85,7 @@ public class ChunkManager : MonoBehaviour
                 }
                 else
                 {
-                    GetChunk(old_chunk_id).Unload(this);
+                    GetChunk(old_chunk_id).Unload();
                 }
             }
 
@@ -93,7 +93,7 @@ public class ChunkManager : MonoBehaviour
             {
                 if (!needed_neighbours.Contains(new_chunk_neighbor_id))
                 {
-                    GetChunkFromFile(new_chunk_neighbor_id).Load(this);
+                    GetChunkFromFile(new_chunk_neighbor_id).Load();
                 }
             }
         }
@@ -177,8 +177,6 @@ public class ChunkManager : MonoBehaviour
             GetChunkAtLoc(wo.Key.transform.position).InitialseObj(wo.Value, wo.Key);
         }
 
-        SaveHierarchy();
-
         EntityManager.OverrideEntityData();
         SaveAllChunkData();
         ClearAllObjects();
@@ -186,45 +184,7 @@ public class ChunkManager : MonoBehaviour
 
     public void SaveHierarchy()
     {
-        foreach (Basic obj in ObjManager.objs)
-        {
-            GameObject go = obj.obj_data.runtime_ref;
 
-            if (go.transform.parent != null)
-            {
-                if (go.transform.parent.name == "World Objects")
-                {
-                    obj.obj_parent = (int)ObjManager.StaticObjects.WORLD_OBJECTS;
-                }
-                else if (go.transform.parent.name == "World Entities")
-                {
-                    obj.obj_parent = (int)ObjManager.StaticObjects.WORLD_ENTITIES;
-                }
-                else
-                {
-                    if (obj.obj_parent == -1)
-                    {
-                        obj.obj_parent = ObjManager.FindObject(go.transform.parent.name).obj_data.obj_id;
-                    }
-                }
-
-            }
-
-            if (go.transform.childCount > 0)
-            {
-                obj.obj_children = new List<int>();
-
-                Transform[] children = go.GetComponentsInChildren<Transform>();
-
-                foreach (Transform child in children)
-                {
-                    if (child != go.transform)
-                    {
-                        obj.obj_children.Add(ObjManager.FindObject(child.name).obj_data.obj_id);
-                    }
-                }
-            }
-        }
     }
 
     public void LoadChunksFromDisk()
@@ -232,7 +192,6 @@ public class ChunkManager : MonoBehaviour
         string path = Application.dataPath + "/Resources/World Data/Chunks";
         if (!IsDirectoryEmpty(path))
         {
-            chunk_data.pending_childs = new List<Basic>();
             ClearAllObjects();
             RemoveChunks();
 
@@ -244,7 +203,7 @@ public class ChunkManager : MonoBehaviour
             foreach (FileInfo fo in assetsInfo)
             {
                 Chunk chunk = GetChunkFromFile(i);
-                chunk.Load(this);
+                chunk.Load();
 
                 i++;
             }
@@ -379,7 +338,7 @@ public class ChunkManager : MonoBehaviour
 
     #region HelperFunctions
 
-    public void DeleteObject(Obj obj)
+    public static void DeleteObject(Basic obj)
     {
         Destroy(obj.runtime_ref);
         obj.runtime_ref = null;
@@ -394,8 +353,6 @@ public class ChunkManager : MonoBehaviour
 
     public void FindWorldObjects()
     {
-        ObjManager.objs = new List<Basic>();
-
         world_objects = new Dictionary<GameObject, ObjectTypes>();
 
         GameObject wo = GameObject.FindGameObjectWithTag("World Objects");
@@ -411,21 +368,20 @@ public class ChunkManager : MonoBehaviour
         {
             if (obj.obj_parent == (int)ObjManager.StaticObjects.WORLD_OBJECTS)
             {
-                obj.obj_data.runtime_ref.transform.parent = GameObject.Find("World Objects").transform;
+                obj.runtime_ref.transform.parent = GameObject.Find("World Objects").transform;
             }
             else if (obj.obj_parent == (int)ObjManager.StaticObjects.WORLD_OBJECTS)
             {
-                obj.obj_data.runtime_ref.transform.parent = GameObject.Find("World Entities").transform;
+                obj.runtime_ref.transform.parent = GameObject.Find("World Entities").transform;
             }
             else
             {
-                if (obj.obj_parent != -1)
+                Basic parent = ObjManager.FindObject(chunk_data.pending_childs, obj.obj_parent);
+                if (parent != null)
                 {
-                    Basic parent = ObjManager.FindObject(obj.obj_parent);
-                    obj.obj_data.runtime_ref.transform.parent = parent.obj_data.runtime_ref.transform;
+                    obj.runtime_ref.transform.parent = parent.runtime_ref.transform;
                 }
             }
-
         }
         chunk_data.pending_childs.Clear();
     }
@@ -438,6 +394,9 @@ public class ChunkManager : MonoBehaviour
 
     public void ClearAllObjects()
     {
+        chunk_data.pending_childs = new List<Basic>();
+        chunk_data.world_objects = new List<Basic>();
+
         FindWorldObjects();
         foreach (KeyValuePair<GameObject, ObjectTypes> wo in world_objects)
         {

@@ -19,25 +19,27 @@ public static class ObjManager
         WORLD_ENTITIES = 1
     }
 
+    //get rid of all functioanlity besides increment 
+
     static int obj_index = 2;
 
-    public static List<Basic> objs = new List<Basic>();
-
-    public static void AddObject(Basic obj, bool is_new)
+    public static void Init(Basic obj)
     {
-        if (is_new)
-        {
-            obj.obj_data.obj_id = obj_index;
-            obj_index += 1;
-        }
-        objs.Add(obj);
+        obj.obj_id = obj_index;
+        obj_index += 1;
     }
 
-    public static Basic FindObject(string name)
+    public static void LoadObject(ChunkData chunk_data, Basic obj)
     {
-        foreach (Basic obj in objs)
+        chunk_data.pending_childs.Add(obj);
+        chunk_data.world_objects.Add(obj);
+    }
+
+    public static Basic FindObject(List<Basic> objects, int obj_id)
+    {
+        foreach (Basic obj in objects)
         {
-            if (obj.obj_data.name == name)
+            if (obj.obj_id == obj_id)
             {
                 return obj;
             }
@@ -45,24 +47,60 @@ public static class ObjManager
         return null;
     }
 
-    public static Basic FindObject(int id)
+    public static void RemoveObject(ChunkData chunk_data, Basic obj)
     {
-        foreach (Basic obj in objs)
-        {
-            if (obj.obj_data.obj_id == id)
-            {
-                return obj;
-            }
-        }
-        return null;
+        chunk_data.pending_childs.Remove(obj);
+        chunk_data.world_objects.Remove(obj);
     }
 }
 
 [Serializable]
-public class Obj
+public class Basic
 {
+    public Basic(Chunk chunk, GameObject go)
+    {
+        Initialise(go);
+
+        if (go.transform.parent.name == "World Objects")
+        {
+            obj_parent = (int)ObjManager.StaticObjects.WORLD_OBJECTS;
+        }
+        else if (go.transform.parent.name == "World Entities")
+        {
+            obj_parent = (int)ObjManager.StaticObjects.WORLD_ENTITIES;
+        }
+
+        if (go.transform.childCount > 0)
+        {
+            obj_children = new List<int>();
+
+            Transform[] children = go.GetComponentsInChildren<Transform>();
+
+            foreach (Transform child in children)
+            {
+                if (child != go.transform)
+                {
+                    Basic new_obj = new Basic(ChunkManager.GetChunkAtLoc(child.transform.position), child.gameObject);
+                    new_obj.AddParent(this.obj_id);
+                    obj_children.Add(new_obj.obj_id);
+                }
+            }
+        }
+        chunk.basic_objects.Add(this);
+    }
+
+    public void AddParent(int parent_id)
+    {
+        obj_parent = parent_id;
+    }
+
+
+
     public string name;
     public int obj_id = -1;
+
+    public int obj_parent = -1;
+    public List<int> obj_children = null;
 
     public ObjectTypes obj_type = ObjectTypes.BASIC;
     public GameObject runtime_ref;
@@ -81,6 +119,16 @@ public class Obj
 
     public void SaveObjectData(GameObject go)
     {
+        Transform trans = go.GetComponent<Transform>();
+
+        name = go.name;
+
+        obj_position = trans.position;
+        obj_rotation = trans.rotation;
+        obj_scale = trans.localScale;
+
+        runtime_ref = go;
+
         if (go.TryGetComponent(out Renderer r))
         {
             string m_path = "Assets/Resources/World Data/";
@@ -189,24 +237,14 @@ public class Obj
         }
     }
 
-    public void Initialise(Basic obj, GameObject go)
+    public void Initialise(GameObject go)
     {
-        ObjManager.AddObject(obj, true);
+        ObjManager.Init(this);
 
         SaveObjectData(go);
-
-        Transform trans = go.GetComponent<Transform>();
-
-        name = go.name;
-
-        obj_position = trans.position;
-        obj_rotation = trans.rotation;
-        obj_scale = trans.localScale;
-
-        runtime_ref = go;
     }
 
-    public void SpawnObject()
+    public void Spawn()
     {
         GameObject go;
         List<Material> mats = new List<Material>();
@@ -298,36 +336,5 @@ public class Obj
 
         go.name = name;
         runtime_ref = go;
-    }
-}
-
-
-[Serializable]
-public class Basic
-{
-    public Obj obj_data;
-
-    public int obj_parent = -1;
-    public List<int> obj_children = null;
-
-    public Basic(Chunk chunk, GameObject go)
-    {
-        obj_data = new Obj();
-        obj_data.Initialise(this, go);
-
-        if (go.transform.childCount > 0)
-        {
-            Transform[] children = go.GetComponentsInChildren<Transform>();
-
-            foreach (Transform child in children)
-            {
-                if (child != go.transform)
-                {
-                    Basic obj = new Basic(ChunkManager.GetChunkAtLoc(child.transform.position), child.gameObject);
-                }
-            }
-        }
-
-        chunk.basic_objects.Add(this);
     }
 }
