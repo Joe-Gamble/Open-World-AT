@@ -11,6 +11,54 @@ public enum ObjectTypes
     ENTITY
 }
 
+[Serializable]
+public class TransformData
+{
+    public TransformData(GameObject go)
+    {
+        Transform trans = go.GetComponent<Transform>();
+        name = go.name;
+
+        parent = -1;
+        children = null;
+
+        position = trans.position;
+        rotation = trans.rotation;
+        scale = trans.localScale;
+
+        if (go.transform.parent.name == "World Objects")
+        {
+            AddParent((int)ObjManager.StaticObjects.WORLD_OBJECTS);
+        }
+        else if (go.transform.parent.name == "World Entities")
+        {
+            AddParent((int)ObjManager.StaticObjects.WORLD_ENTITIES);
+        }
+    }
+
+    public void AddParent(int parent_id)
+    {
+        parent = parent_id;
+    }
+
+    public void InitID(int new_id)
+    {
+        id = new_id;
+    }
+
+    public string name;
+    public int id;
+
+    public GameObject runtime_ref;
+
+    public int parent;
+    public List<int> children;
+
+    public Vector3 position;
+    public Quaternion rotation;
+    public Vector3 scale;
+}
+
 public static class ObjManager
 {
     public enum StaticObjects
@@ -21,12 +69,12 @@ public static class ObjManager
 
     //get rid of all functioanlity besides increment 
 
-    static int obj_index = 2;
+    static int index = 2;
 
-    public static void Init(Basic obj)
+    public static int GetUniqueNumber()
     {
-        obj.obj_id = obj_index;
-        obj_index += 1;
+        index += 1;
+        return index;
     }
 
     public static void LoadObject(ChunkData chunk_data, Basic obj)
@@ -39,7 +87,7 @@ public static class ObjManager
     {
         foreach (Basic obj in objects)
         {
-            if (obj.obj_id == obj_id)
+            if (obj.transform_data.id == obj_id)
             {
                 return obj;
             }
@@ -57,57 +105,38 @@ public static class ObjManager
 [Serializable]
 public class Basic
 {
-    public Basic(Chunk chunk, GameObject go)
+    public Basic(Chunk chunk, GameObject go, bool recursive)
     {
         Initialise(go);
+        transform_data = new TransformData(go);
 
-        if (go.transform.parent.name == "World Objects")
+        transform_data.InitID(ObjManager.GetUniqueNumber());
+
+        if (recursive)
         {
-            obj_parent = (int)ObjManager.StaticObjects.WORLD_OBJECTS;
-        }
-        else if (go.transform.parent.name == "World Entities")
-        {
-            obj_parent = (int)ObjManager.StaticObjects.WORLD_ENTITIES;
-        }
-
-        if (go.transform.childCount > 0)
-        {
-            obj_children = new List<int>();
-
-            Transform[] children = go.GetComponentsInChildren<Transform>();
-
-            foreach (Transform child in children)
+            if (go.transform.childCount > 0)
             {
-                if (child != go.transform)
+                transform_data.children = new List<int>();
+
+                Transform[] children_objects = go.GetComponentsInChildren<Transform>();
+
+                foreach (Transform child in children_objects)
                 {
-                    Basic new_obj = new Basic(ChunkManager.GetChunkAtLoc(child.transform.position), child.gameObject);
-                    new_obj.AddParent(this.obj_id);
-                    obj_children.Add(new_obj.obj_id);
+                    if (child != go.transform)
+                    {
+                        Basic new_obj = new Basic(ChunkManager.GetChunkAtLoc(child.transform.position), child.gameObject, true);
+                        new_obj.transform_data.AddParent(this.transform_data.id);
+                        transform_data.children.Add(new_obj.transform_data.id);
+                    }
                 }
             }
+            chunk.basic_objects.Add(this);
         }
-        chunk.basic_objects.Add(this);
     }
 
-    public void AddParent(int parent_id)
-    {
-        obj_parent = parent_id;
-    }
-
-
-
-    public string name;
-    public int obj_id = -1;
-
-    public int obj_parent = -1;
-    public List<int> obj_children = null;
+    public TransformData transform_data;
 
     public ObjectTypes obj_type = ObjectTypes.BASIC;
-    public GameObject runtime_ref;
-
-    public Vector3 obj_position;
-    public Quaternion obj_rotation;
-    public Vector3 obj_scale;
 
     public bool is_unity_primitive = false;
     public PrimitiveType primitive_type;
@@ -119,16 +148,6 @@ public class Basic
 
     public void SaveObjectData(GameObject go)
     {
-        Transform trans = go.GetComponent<Transform>();
-
-        name = go.name;
-
-        obj_position = trans.position;
-        obj_rotation = trans.rotation;
-        obj_scale = trans.localScale;
-
-        runtime_ref = go;
-
         if (go.TryGetComponent(out Renderer r))
         {
             string m_path = "Assets/Resources/World Data/";
@@ -239,8 +258,6 @@ public class Basic
 
     public void Initialise(GameObject go)
     {
-        ObjManager.Init(this);
-
         SaveObjectData(go);
     }
 
@@ -296,10 +313,6 @@ public class Basic
                     go.AddComponent<MeshFilter>().sharedMesh = Resources.Load<Mesh>("World Data/Meshes/" + obj_mesh);
                     mr.sharedMaterials = mats.ToArray();
                 }
-                else if (renderer_type == "UnityEngine.SkinnedMeshRenderer")
-                {
-                    //chunk.skinned_mesh_objects.Add(this);
-                }
             }
         }
 
@@ -330,11 +343,11 @@ public class Basic
             }
         }
 
-        go.GetComponent<Transform>().position = obj_position;
-        go.GetComponent<Transform>().rotation = obj_rotation;
-        go.GetComponent<Transform>().localScale = obj_scale;
+        go.GetComponent<Transform>().position = transform_data.position;
+        go.GetComponent<Transform>().rotation = transform_data.rotation;
+        go.GetComponent<Transform>().localScale = transform_data.scale;
 
-        go.name = name;
-        runtime_ref = go;
+        go.name = transform_data.name;
+        transform_data.runtime_ref = go;
     }
 }

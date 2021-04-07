@@ -53,6 +53,12 @@ public class WorldManager : MonoBehaviour
         Initialise();
     }
 
+    public static void DeleteObject(TransformData data)
+    {
+        Destroy(data.runtime_ref);
+        data.runtime_ref = null;
+    }
+
     public void Initialise()
     {
         chunkManager = this.GetComponent<ChunkManager>();
@@ -62,7 +68,7 @@ public class WorldManager : MonoBehaviour
         chunkManager.InitialiseSpawnChunks(spawn_chunk);
         lighting_manager.LoadLightingPresets();
 
-        player.transform.position = chunkManager.GetChunk(spawn_chunk).chunk_pos;
+        player.transform.position = chunkManager.GetCurrentChunk().chunk_pos;
     }
 
     // Update is called once per frame
@@ -190,7 +196,6 @@ public class WorldManagerEditor : EditorWindow
         {
             chunk_manager.ClearAllObjects();
         }
-
 
         if (GUILayout.Button("Generate Chunks"))
         {

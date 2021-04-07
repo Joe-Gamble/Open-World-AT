@@ -12,7 +12,7 @@ public class Chunk
     public int chunk_ID;
 
     public List<Basic> basic_objects;
-    public List<string> entity_references;
+    public List<TransformData> entity_references;
 
     public Bounds chunk_bounds;
     public List<int> chunk_neighbours;
@@ -26,7 +26,7 @@ public class Chunk
             ObjManager.LoadObject(ChunkManager.GetChunks(), obj);
         }
 
-        foreach (string ent in entity_references)
+        foreach (TransformData ent in entity_references)
         {
             EntityManager.SpawnEntity(ent);
         }
@@ -42,7 +42,13 @@ public class Chunk
 
         foreach (Basic basic in basic_objects)
         {
-            ChunkManager.DeleteObject(basic);
+            Debug.Log(basic.transform_data.name);
+            WorldManager.DeleteObject(basic.transform_data);
+        }
+
+        foreach (TransformData ent in entity_references)
+        {
+            EntityManager.Despawn(ent);
         }
 
         ChunkManager.GetChunks().chunks.Remove(this);
@@ -72,7 +78,7 @@ public class Chunk
     {
         foreach (Basic obj in GetObjects())
         {
-            if (obj.runtime_ref == go)
+            if (obj.transform_data.runtime_ref == go)
             {
                 return true;
             }
@@ -100,12 +106,12 @@ public class Chunk
         {
             case ObjectTypes.BASIC:
                 {
-                    Basic basic = new Basic(this, go);
+                    Basic basic = new Basic(this, go, true);
                     break;
                 }
             case ObjectTypes.ENTITY:
                 {
-                    entity_references.Add(EntityManager.AddEntity(go));
+                    entity_references.Add(EntityManager.AddEntity(this, go));
                     break;
                 }
             default:
@@ -118,7 +124,7 @@ public class Chunk
     public void ResetObjects()
     {
         basic_objects = new List<Basic>();
-        entity_references = new List<string>();
+        entity_references = new List<TransformData>();
     }
 }
 

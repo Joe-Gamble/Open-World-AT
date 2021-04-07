@@ -32,7 +32,7 @@ public class ChunkManager : MonoBehaviour
     #region RunTime Functions
 
     //Create a Chunk from Json Data
-    private Chunk GetChunkFromFile(int chunk_id)
+    public Chunk GetChunkFromFile(int chunk_id)
     {
         string path = File.ReadAllText(Application.dataPath + "/Resources/World Data/Chunks/Chunk" + chunk_id + " Data.json");
 
@@ -340,8 +340,8 @@ public class ChunkManager : MonoBehaviour
 
     public static void DeleteObject(Basic obj)
     {
-        Destroy(obj.runtime_ref);
-        obj.runtime_ref = null;
+        Destroy(obj.transform_data.runtime_ref);
+        obj.transform_data.runtime_ref = null;
     }
 
 
@@ -366,20 +366,21 @@ public class ChunkManager : MonoBehaviour
     {
         foreach (Basic obj in chunk_data.pending_childs)
         {
-            if (obj.obj_parent == (int)ObjManager.StaticObjects.WORLD_OBJECTS)
+            TransformData trans = obj.transform_data;
+            if (trans.parent == (int)ObjManager.StaticObjects.WORLD_OBJECTS)
             {
-                obj.runtime_ref.transform.parent = GameObject.Find("World Objects").transform;
+                obj.transform_data.runtime_ref.transform.parent = GameObject.Find("World Objects").transform;
             }
-            else if (obj.obj_parent == (int)ObjManager.StaticObjects.WORLD_OBJECTS)
+            else if (trans.parent == (int)ObjManager.StaticObjects.WORLD_OBJECTS)
             {
-                obj.runtime_ref.transform.parent = GameObject.Find("World Entities").transform;
+                obj.transform_data.runtime_ref.transform.parent = GameObject.Find("World Entities").transform;
             }
             else
             {
-                Basic parent = ObjManager.FindObject(chunk_data.pending_childs, obj.obj_parent);
+                Basic parent = ObjManager.FindObject(chunk_data.pending_childs, trans.parent);
                 if (parent != null)
                 {
-                    obj.runtime_ref.transform.parent = parent.runtime_ref.transform;
+                    obj.transform_data.runtime_ref.transform.parent = parent.transform_data.runtime_ref.transform;
                 }
             }
         }
