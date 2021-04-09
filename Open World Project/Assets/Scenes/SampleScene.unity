@@ -123,7 +123,7 @@ NavMeshSettings:
     preserveTilesOutsideBounds: 0
     debug:
       m_Flags: 0
-  m_NavMeshData: {fileID: 0}
+  m_NavMeshData: {fileID: 23800000, guid: 2e7be838daf857747971562e02a9f43e, type: 2}
 --- !u!1 &83105317
 GameObject:
   m_ObjectHideFlags: 0
@@ -735,7 +735,7 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
-  m_LocalRotation: {x: 0.048151977, y: 0.0030759294, z: -0.0001482848, w: 0.99883527}
+  m_LocalRotation: {x: 0.048151873, y: 0.0037571013, z: -0.00018112281, w: 0.998833}
   m_LocalPosition: {x: 9.233332, y: 1.9740696, z: -16.590488}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
@@ -1300,7 +1300,7 @@ GameObject:
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
+  m_StaticEditorFlags: 8
   m_IsActive: 1
 --- !u!65 &1569165852
 BoxCollider:
@@ -1444,7 +1444,7 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1644065520}
-  m_LocalRotation: {x: 0.046630017, y: 0.0031389298, z: -0.00014652843, w: 0.9989073}
+  m_LocalRotation: {x: 0.04662992, y: 0.0038340536, z: -0.00017897761, w: 0.9989049}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:

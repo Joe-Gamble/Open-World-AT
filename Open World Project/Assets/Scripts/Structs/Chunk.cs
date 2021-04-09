@@ -93,6 +93,11 @@ public class Chunk
 
     public void OverrideData()
     {
+        foreach (TransformData ent in entity_references)
+        {
+            ent.position = ent.runtime_ref.transform.position;
+        }
+
         string path = Application.dataPath + "/Resources/World Data/Chunks/Chunk" + chunk_ID + " Data.json";
 
         string json = JsonUtility.ToJson(this);

@@ -55,8 +55,18 @@ public class WorldManager : MonoBehaviour
 
     public static void DeleteObject(TransformData data)
     {
-        Destroy(data.runtime_ref);
-        data.runtime_ref = null;
+        if (data.runtime_ref != null)
+        {
+            if (Application.isPlaying)
+            {
+                Destroy(data.runtime_ref);
+            }
+            else
+            {
+                DestroyImmediate(data.runtime_ref);
+            }
+            data.runtime_ref = null;
+        }
     }
 
     public void Initialise()

@@ -4,14 +4,6 @@ using UnityEngine;
 using UnityEditor;
 using System.Linq;
 using System.IO;
-using System.Threading.Tasks;
-
-//To do tomorrow
-/*
--- Day/Night Cycle
--- Weather
---More chunk functionality to save objects/chunks?
-*/
 
 public class ChunkManager : MonoBehaviour
 {
@@ -182,11 +174,6 @@ public class ChunkManager : MonoBehaviour
         ClearAllObjects();
     }
 
-    public void SaveHierarchy()
-    {
-
-    }
-
     public void LoadChunksFromDisk()
     {
         string path = Application.dataPath + "/Resources/World Data/Chunks";
@@ -337,14 +324,6 @@ public class ChunkManager : MonoBehaviour
     #endregion
 
     #region HelperFunctions
-
-    public static void DeleteObject(Basic obj)
-    {
-        Destroy(obj.transform_data.runtime_ref);
-        obj.transform_data.runtime_ref = null;
-    }
-
-
 
     public bool IsDirectoryEmpty(string path)
     {

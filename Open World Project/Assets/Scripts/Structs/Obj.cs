@@ -173,8 +173,6 @@ public class Basic
                 SaveMats(m_path, smr.sharedMaterials);
             }
 
-
-
             //Meshes
             if (obj_mesh != null)
             {

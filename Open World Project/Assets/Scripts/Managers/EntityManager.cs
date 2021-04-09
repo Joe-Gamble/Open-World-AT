@@ -13,6 +13,7 @@ public struct SkinnedMeshData
     public int root_ref;
     public int[] bones_refs;
     public List<BoneWeight> bone_weights;
+    public Matrix4x4[] bindPoses;
 }
 
 [Serializable]
@@ -26,8 +27,8 @@ public class Entity
     public SkinnedMeshData mesh_data;
     public List<TransformData> objects;
 
-    public NavMeshAgent ent_agent;
-    public Animator ent_animator;
+    public bool ent_agent;
+    public string ent_animator = "";
     public int health;
 
     public int index = 3;
@@ -42,6 +43,47 @@ public class Entity
         transform_data.id = index;
 
         transform_data = InitChildren(transform_data, go.transform);
+
+        SaveEntityData(go);
+    }
+
+    public void SaveEntityData(GameObject go)
+    {
+        if (go.TryGetComponent(out Animator ani))
+        {
+            string r_path = "World Data/Entities/Animators/" + ani.name;
+            if (Resources.Load("World Data/Entities/Animators/" + ani.name) != null)
+            {
+                ent_animator = r_path;
+                Debug.Log("Found Animator");
+            }
+        }
+        if (go.TryGetComponent(out NavMeshAgent agent))
+        {
+            ent_agent = true;
+            Debug.Log("Found Agent");
+        }
+        AssetDatabase.Refresh();
+    }
+
+    public void LoadEntityData()
+    {
+        GameObject entity_go = transform_data.runtime_ref;
+        if (entity_go != null)
+        {
+            if (ent_animator != "")
+            {
+                Animator ani = entity_go.AddComponent<Animator>();
+                ani.runtimeAnimatorController = Resources.Load(ent_animator) as RuntimeAnimatorController;
+            }
+            if (ent_agent)
+            {
+                NavMeshAgent agent = entity_go.AddComponent<NavMeshAgent>();
+                agent.speed = 1;
+
+                entity_go.AddComponent<EntityMovement>();
+            }
+        }
     }
 
     public TransformData InitChildren(TransformData parent_data, Transform obj)
@@ -79,6 +121,9 @@ public class Entity
 
                     //Bones Array
                     mesh_data.bones_refs = GetBones(smr.bones);
+
+                    //BindPoses
+                    mesh_data.bindPoses = smr.sharedMesh.bindposes;
                 }
                 else if (child != obj)
                 {
@@ -133,34 +178,6 @@ public class Entity
         }
         return bone_refs.ToArray();
     }
-
-    public TransformData[] ExtractChildren(Transform[] bones)
-    {
-        List<TransformData> children = new List<TransformData>();
-
-        foreach (Transform bone in bones)
-        {
-
-        }
-        return children.ToArray();
-    }
-
-    /*
-
-private void SaveEntityData(GameObject go)
-{
-    if (go.TryGetComponent(out NavMeshAgent agent))
-    {
-        ent_agent = agent;
-    }
-
-    if (go.TryGetComponent(out Animator animator))
-    {
-        ent_animator = animator;
-    }
-}
-
-*/
 }
 
 [Serializable]
@@ -186,13 +203,6 @@ public class EntityManager
         return collection;
     }
 
-    public static void RefreshList()
-    {
-        collection = new EntityCollection();
-        collection = GetCollection();
-        AssetDatabase.Refresh();
-    }
-
     public static TransformData AddEntity(Chunk chunk, GameObject go)
     {
         if (collection.entities == null)
@@ -206,7 +216,7 @@ public class EntityManager
             {
                 if (go.name == ent.name)
                 {
-                    return ent.transform_data;
+                    return new TransformData(go);
                 }
             }
         }
@@ -225,7 +235,6 @@ public class EntityManager
 
     public static void LinkEntity(Entity entity)
     {
-        Debug.Log("yes");
         foreach (TransformData obj_data in entity.objects)
         {
             Transform obj_trans = obj_data.runtime_ref.transform;
@@ -259,7 +268,6 @@ public class EntityManager
         {
             if (entity.name == ent.name)
             {
-                entity.mesh_data.mesh_object.Spawn();
                 foreach (TransformData data in entity.objects)
                 {
                     GameObject go = new GameObject();
@@ -271,37 +279,26 @@ public class EntityManager
                     go.transform.localScale = data.scale;
 
                     data.runtime_ref = go;
-                }
-
-                LinkEntity(entity);
-
-                foreach (TransformData data in entity.objects)
-                {
-                    if (data.id == entity.mesh_data.mesh_object.transform_data.id)
-                    {
-                        GameObject mesh = entity.mesh_data.mesh_object.transform_data.runtime_ref;
-
-                        mesh.transform.parent = data.runtime_ref.transform.parent;
-                        WorldManager.DeleteObject(data);
-                    }
 
                     if (data.id == entity.transform_data.id)
                     {
-                        data.runtime_ref.transform.position = ent.position;
-                        data.runtime_ref.transform.rotation = ent.rotation;
-                        data.runtime_ref.transform.localScale = ent.scale;
-
-                        ent.runtime_ref = data.runtime_ref;
+                        entity.transform_data = data;
+                        ent.runtime_ref = go;
                     }
                 }
 
+                entity.mesh_data.mesh_object.Spawn();
+
+                LinkEntity(entity);
 
                 SkinnedMeshData mesh_data = entity.mesh_data;
                 Basic entity_obj = mesh_data.mesh_object;
                 GameObject mesh_object = entity_obj.transform_data.runtime_ref;
 
                 Transform root = entity.FindObject(mesh_data.root_ref).runtime_ref.transform;
-                root.localScale = new Vector3(1, 1, 1);
+                Transform armature = entity.transform_data.runtime_ref.transform.Find("Armature");
+
+                //root.localScale = new Vector3(1, 1, 1);
                 List<Transform> bone_data = new List<Transform>();
 
                 foreach (int bone_id in mesh_data.bones_refs)
@@ -311,17 +308,21 @@ public class EntityManager
 
                 Transform[] bones = bone_data.ToArray();
 
-                List<Matrix4x4> bindPoses = new List<Matrix4x4>();
-
-                foreach (Transform bone in bones)
-                {
-                    Matrix4x4 new_pose = bone.worldToLocalMatrix * mesh_object.transform.localToWorldMatrix;
-                    bindPoses.Add(new_pose);
-                }
+                Matrix4x4[] bindPoses = mesh_data.bindPoses;
 
                 SkinnedMeshRenderer smr = mesh_object.AddComponent<SkinnedMeshRenderer>();
 
+                smr.rootBone = root;
+
                 List<Material> mats = new List<Material>();
+
+                Mesh mesh = Resources.Load<Mesh>("World Data/Meshes/" + entity_obj.obj_mesh);
+
+                mesh.boneWeights = mesh_data.bone_weights.ToArray();
+
+                mesh.bindposes = bindPoses;
+                smr.bones = bones;
+                smr.sharedMesh = mesh;
 
                 if (entity_obj.obj_mats != null)
                 {
@@ -336,21 +337,32 @@ public class EntityManager
                     smr.sharedMaterials = mats.ToArray();
                 }
 
-                smr.sharedMesh = Resources.Load<Mesh>("World Data/Meshes/" + entity_obj.obj_mesh);
+                entity.LoadEntityData();
 
-                smr.sharedMesh.bindposes = bindPoses.ToArray();
+                foreach (TransformData data in entity.objects)
+                {
+                    if (data.id == entity.mesh_data.mesh_object.transform_data.id)
+                    {
+                        GameObject mesh_go = entity.mesh_data.mesh_object.transform_data.runtime_ref;
 
-                smr.sharedMesh.boneWeights = mesh_data.bone_weights.ToArray();
+                        mesh_go.transform.parent = data.runtime_ref.transform.parent;
+                        WorldManager.DeleteObject(data);
+                    }
+                }
 
-                smr.rootBone = root;
-                smr.bones = bones;
+                if (entity.transform_data.runtime_ref != null)
+                {
+                    entity.transform_data.runtime_ref.transform.position = ent.position;
+                    entity.transform_data.runtime_ref.transform.rotation = ent.rotation;
+                    entity.transform_data.runtime_ref.transform.localScale = ent.scale;
+                }
             }
         }
     }
 
     public static void Despawn(TransformData data)
     {
-        Debug.Log(data.name);
+        Debug.Log(data.runtime_ref.name);
         WorldManager.DeleteObject(data);
     }
 }
