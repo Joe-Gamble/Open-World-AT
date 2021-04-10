@@ -46,10 +46,14 @@ public class EntityMovement : MonoBehaviour
         current_speed = curMove.magnitude / Time.deltaTime;
         previousPosition = transform.position;
 
+        /*
+
         if (!is_moving)
         {
             StartCoroutine("PassiveMove");
         }
+
+        */
 
         entity_animator.SetFloat("Speed", current_speed);
 
@@ -58,8 +62,8 @@ public class EntityMovement : MonoBehaviour
     IEnumerator PassiveMove()
     {
         is_moving = true;
-        yield return new WaitForSeconds(Random.Range(1, 5)); ;
         GetRandomLoc();
+        yield return new WaitForSeconds(Random.Range(3, 8));
         is_moving = false;
     }
 

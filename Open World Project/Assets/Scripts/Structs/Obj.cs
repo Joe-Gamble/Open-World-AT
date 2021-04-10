@@ -26,13 +26,16 @@ public class TransformData
         rotation = trans.rotation;
         scale = trans.localScale;
 
-        if (go.transform.parent.name == "World Objects")
+        if (go.transform.parent != null)
         {
-            AddParent((int)ObjManager.StaticObjects.WORLD_OBJECTS);
-        }
-        else if (go.transform.parent.name == "World Entities")
-        {
-            AddParent((int)ObjManager.StaticObjects.WORLD_ENTITIES);
+            if (go.transform.parent.name == "World Objects")
+            {
+                AddParent((int)ObjManager.StaticObjects.WORLD_OBJECTS);
+            }
+            else if (go.transform.parent.name == "World Entities")
+            {
+                AddParent((int)ObjManager.StaticObjects.WORLD_ENTITIES);
+            }
         }
     }
 

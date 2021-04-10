@@ -31,7 +31,7 @@ public class Entity
     public string ent_animator = "";
     public int health;
 
-    public int index = 3;
+    public int index = 2;
 
     public Entity(GameObject go)
     {
@@ -39,10 +39,7 @@ public class Entity
         objects = new List<TransformData>();
         mesh_data = new SkinnedMeshData();
 
-        transform_data = new TransformData(go);
-        transform_data.id = index;
-
-        transform_data = InitChildren(transform_data, go.transform);
+        transform_data = InitChildren(new TransformData(go.transform.parent.gameObject), go.transform);
 
         SaveEntityData(go);
     }
@@ -55,13 +52,11 @@ public class Entity
             if (Resources.Load("World Data/Entities/Animators/" + ani.name) != null)
             {
                 ent_animator = r_path;
-                Debug.Log("Found Animator");
             }
         }
         if (go.TryGetComponent(out NavMeshAgent agent))
         {
             ent_agent = true;
-            Debug.Log("Found Agent");
         }
         AssetDatabase.Refresh();
     }
@@ -89,8 +84,14 @@ public class Entity
     public TransformData InitChildren(TransformData parent_data, Transform obj)
     {
         TransformData obj_data = new TransformData(obj.gameObject);
-        obj_data.id = index += 1;
-        obj_data.parent = parent_data.id;
+        obj_data.id = index;
+        index += 1;
+
+        if (obj_data.parent == -1)
+        {
+            obj_data.parent = parent_data.id;
+        }
+
         obj_data.runtime_ref = obj.gameObject;
 
         if (obj.childCount > 0)
@@ -238,26 +239,26 @@ public class EntityManager
         foreach (TransformData obj_data in entity.objects)
         {
             Transform obj_trans = obj_data.runtime_ref.transform;
-            TransformData parent_trans = entity.FindObject(obj_data.parent);
 
-            Transform parent;
-
-            if (parent_trans != null)
+            if (obj_data.parent == (int)ObjManager.StaticObjects.WORLD_ENTITIES)
             {
-                if (parent_trans.id == (int)ObjManager.StaticObjects.WORLD_ENTITIES)
+                obj_trans.parent = GameObject.Find("World Entities").transform;
+            }
+            else if (obj_data.parent == (int)ObjManager.StaticObjects.WORLD_OBJECTS)
+            {
+                obj_trans.parent = GameObject.Find("World Objects").transform;
+            }
+            else
+            {
+                TransformData parent_trans = entity.FindObject(obj_data.parent);
+
+                if (parent_trans != null)
                 {
-                    Debug.Log("Origin");
-                    parent = GameObject.Find("World Entities").transform;
-                }
-                else if (parent_trans.id == (int)ObjManager.StaticObjects.WORLD_ENTITIES)
-                {
-                    parent = GameObject.Find("World Objects").transform;
-                }
-                else
-                {
+                    Transform parent;
+
                     parent = parent_trans.runtime_ref.transform;
+                    obj_trans.parent = parent;
                 }
-                obj_trans.parent = parent;
             }
         }
     }
@@ -362,7 +363,6 @@ public class EntityManager
 
     public static void Despawn(TransformData data)
     {
-        Debug.Log(data.runtime_ref.name);
         WorldManager.DeleteObject(data);
     }
 }

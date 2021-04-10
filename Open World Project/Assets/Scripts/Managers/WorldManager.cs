@@ -69,6 +69,29 @@ public class WorldManager : MonoBehaviour
         }
     }
 
+    private void OnDrawGizmos()
+    {
+        if (ChunkManager.HasChunks())
+        {
+            ChunkData chunk_data = ChunkManager.GetChunks();
+            float chunk_size = chunk_data.chunk_size;
+
+            foreach (Chunk chunk in ChunkManager.GetChunks().chunks)
+            {
+                if (chunk == ChunkManager.GetCurrentChunk())
+                {
+                    Gizmos.color = Color.green;
+                    Gizmos.DrawCube(chunk.chunk_pos, new Vector3(chunk_size, 40, chunk_size));
+                }
+                else
+                {
+                    Gizmos.color = Color.white;
+                    Gizmos.DrawCube(chunk.chunk_pos, new Vector3(chunk_size, 40, chunk_size));
+                }
+            }
+        }
+    }
+
     public void Initialise()
     {
         chunkManager = this.GetComponent<ChunkManager>();
@@ -78,7 +101,7 @@ public class WorldManager : MonoBehaviour
         chunkManager.InitialiseSpawnChunks(spawn_chunk);
         lighting_manager.LoadLightingPresets();
 
-        player.transform.position = chunkManager.GetCurrentChunk().chunk_pos;
+        player.transform.position = ChunkManager.GetCurrentChunk().chunk_pos;
     }
 
     // Update is called once per frame
@@ -96,7 +119,7 @@ public class WorldManager : MonoBehaviour
 
             #region Chunks
 
-            Chunk current_chunk = chunkManager.GetCurrentChunk();
+            Chunk current_chunk = ChunkManager.GetCurrentChunk();
             if (!current_chunk.chunk_bounds.Contains(player.transform.position))
             {
                 foreach (int neighbour in current_chunk.chunk_neighbours)
@@ -211,14 +234,14 @@ public class WorldManagerEditor : EditorWindow
         {
             chunk_manager.divides = d;
 
-            if (chunk_manager.HasChunks())
+            if (ChunkManager.HasChunks())
             {
                 chunk_manager.RemoveChunks();
             }
             chunk_manager.MakeChunks();
         }
 
-        if (chunk_manager.HasChunks())
+        if (ChunkManager.HasChunks())
         {
             if (GUILayout.Button("Delete Chunks"))
             {

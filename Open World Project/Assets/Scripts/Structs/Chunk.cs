@@ -56,8 +56,6 @@ public class Chunk
 
     public void RefreshChunkObjects(Dictionary<GameObject, ObjectTypes> world_objects)
     {
-        //ThreadManager.StartThreadedFunction(() => { FindWorldObjects(wo, eh); });
-
         foreach (KeyValuePair<GameObject, ObjectTypes> wo in world_objects)
         {
             if (chunk_bounds.Contains(wo.Key.transform.position))
@@ -93,11 +91,6 @@ public class Chunk
 
     public void OverrideData()
     {
-        foreach (TransformData ent in entity_references)
-        {
-            ent.position = ent.runtime_ref.transform.position;
-        }
-
         string path = Application.dataPath + "/Resources/World Data/Chunks/Chunk" + chunk_ID + " Data.json";
 
         string json = JsonUtility.ToJson(this);

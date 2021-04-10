@@ -48,7 +48,6 @@ public class ChunkManager : MonoBehaviour
     public void EnterNewChunk(bool spawning, Chunk spawn_chunk)
     {
         FindWorldObjects();
-
         chunk_data.pending_childs = new List<Basic>();
 
         if (spawning)
@@ -64,6 +63,8 @@ public class ChunkManager : MonoBehaviour
         else
         {
             List<int> needed_neighbours = new List<int>();
+
+            RefreshEntities();
 
             foreach (int old_chunk_id in chunk_data.current_chunk.chunk_neighbours)
             {
@@ -341,6 +342,27 @@ public class ChunkManager : MonoBehaviour
         ExtractChildrenFromObject(ObjectTypes.ENTITY, we);
     }
 
+    private void RefreshEntities()
+    {
+        foreach (Chunk chunk in chunk_data.chunks)
+        {
+            foreach (TransformData ent in chunk.entity_references.ToList())
+            {
+                if (!chunk.chunk_bounds.Contains(ent.runtime_ref.transform.position))
+                {
+                    ent.position = ent.runtime_ref.transform.position;
+                    ChunkManager.GetChunkAtLoc(ent.position).entity_references.Add(ent);
+
+                    chunk.entity_references.Remove(ent);
+                }
+                else
+                {
+                    ent.position = ent.runtime_ref.transform.position;
+                }
+            }
+        }
+    }
+
     private void LinkChildren()
     {
         foreach (Basic obj in chunk_data.pending_childs)
@@ -367,7 +389,7 @@ public class ChunkManager : MonoBehaviour
     }
 
 
-    public bool HasChunks()
+    public static bool HasChunks()
     {
         return !(chunk_data.chunks == null);
     }
@@ -458,7 +480,7 @@ public class ChunkManager : MonoBehaviour
         return chunk_data;
     }
 
-    public Chunk GetCurrentChunk()
+    public static Chunk GetCurrentChunk()
     {
         return chunk_data.current_chunk;
     }
@@ -496,22 +518,6 @@ public class ChunkManager : MonoBehaviour
     public static Dictionary<GameObject, ObjectTypes> GetWorldObjects()
     {
         return world_objects;
-    }
-
-    private void OnDrawGizmos()
-    {
-        if (HasChunks())
-        {
-            float chunk_size = chunk_data.chunk_size;
-            foreach (Chunk chunk in chunk_data.chunks)
-            {
-                Gizmos.color = Color.white;
-                Gizmos.DrawWireCube(chunk.chunk_pos, new Vector3(chunk_size, 100, chunk_size));
-
-                Gizmos.color = Color.yellow;
-                Gizmos.DrawWireCube(chunk.chunk_pos, new Vector3(chunk_size / 3, chunk_size, chunk_size / 3));
-            }
-        }
     }
 
     // Update is called once per frame
