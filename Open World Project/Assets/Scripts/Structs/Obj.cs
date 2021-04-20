@@ -2,8 +2,11 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System;
-using UnityEditor;
 using UnityEngine.AI;
+
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public enum ObjectTypes
 {
@@ -105,7 +108,6 @@ public static class ObjManager
     }
 }
 
-[Serializable]
 public class Basic
 {
     public Basic(Chunk chunk, GameObject go, bool recursive)
@@ -136,6 +138,7 @@ public class Basic
             chunk.basic_objects.Add(this);
         }
     }
+
 
     public TransformData transform_data;
 
@@ -240,6 +243,7 @@ public class Basic
         }
     }
 
+
     private void SaveMats(string m_path, Material[] mats)
     {
         if (mats.Length > 0)
@@ -256,6 +260,7 @@ public class Basic
             }
         }
     }
+
 
     public void Initialise(GameObject go)
     {
@@ -352,3 +357,4 @@ public class Basic
         transform_data.runtime_ref = go;
     }
 }
+

@@ -58,7 +58,9 @@ public class Entity
         {
             ent_agent = true;
         }
+#if UNITY_EDITOR
         AssetDatabase.Refresh();
+#endif
     }
 
     public void LoadEntityData()
@@ -76,7 +78,7 @@ public class Entity
                 NavMeshAgent agent = entity_go.AddComponent<NavMeshAgent>();
                 agent.speed = 1;
 
-                entity_go.AddComponent<EntityMovement>();
+                //entity_go.AddComponent<EntityMovement>();
             }
         }
     }
@@ -103,7 +105,6 @@ public class Entity
                 {
                     //SkinnedMeshData serialization
 
-                    //Mesh Object
                     GameObject mesh_go = child.gameObject;
                     mesh_data.mesh_object = new Basic(ChunkManager.GetChunkAtLoc(mesh_go.transform.position), mesh_go, false);
 

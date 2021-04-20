@@ -7,19 +7,19 @@ using System.IO;
 
 public class ChunkManager : MonoBehaviour
 {
+    //Static data type to store all static chunk data
     private static ChunkData chunk_data;
 
+    //Chunk variables
+    //GameObject to define the size of the world; Length is calculated form this object
     public GameObject testPlane;
-
     private float length;
-    public int divides = 3;
+    //Divides desired e.g. 3 = 3x3 chunks
+    public int divides = 5;
 
+
+    //Runtime/EditorTime dictionary for accessing objects of custom type
     private static Dictionary<GameObject, ObjectTypes> world_objects = new Dictionary<GameObject, ObjectTypes>();
-
-    void Start()
-    {
-
-    }
 
     #region RunTime Functions
 
@@ -31,9 +31,12 @@ public class ChunkManager : MonoBehaviour
         Chunk chunk = new Chunk();
         chunk = JsonUtility.FromJson<Chunk>(path);
 
+        Debug.Log(chunk.chunk_ID);
+
         return chunk;
     }
 
+    //Initailse inital and surrounding chunks on game start
     public void InitialiseSpawnChunks(int chunk_id)
     {
         chunk_data = new ChunkData();
@@ -98,6 +101,7 @@ public class ChunkManager : MonoBehaviour
 
     #region Editor Functions
 
+    //Editor function for generating chunks and initalising the data in ChunkData
     public void MakeChunks()
     {
         length = testPlane.GetComponent<Renderer>().bounds.size.x;
@@ -152,6 +156,7 @@ public class ChunkManager : MonoBehaviour
         GenerateChunkNeighbours();
     }
 
+    //Remove the chunks from the world
     public void RemoveChunks()
     {
         if (chunk_data.chunks != null)
@@ -161,6 +166,7 @@ public class ChunkManager : MonoBehaviour
         chunk_data.chunks = new List<Chunk>();
     }
 
+    //Collect and initialse all objects in the world
     public void CollectData()
     {
         FindWorldObjects();
@@ -175,6 +181,8 @@ public class ChunkManager : MonoBehaviour
         ClearAllObjects();
     }
 
+    //Trys to grab and load all chunk files that are currently saved
+    //Used to preview the world and load all saved data before adding additional changes
     public void LoadChunksFromDisk()
     {
         string path = Application.dataPath + "/Resources/World Data/Chunks";
@@ -204,16 +212,20 @@ public class ChunkManager : MonoBehaviour
         }
     }
 
+    //Saves all data for each chunk by overriting json files
     public void SaveAllChunkData()
     {
         foreach (Chunk chunk in chunk_data.chunks)
         {
             chunk.OverrideData();
         }
+#if UNITY_EDITOR
         AssetDatabase.Refresh();
+#endif
     }
     #endregion
 
+    //Dunp for some code I may or may not remove, not relevant for the project but good for some context?
     #region inactive code
     /*
 
@@ -324,13 +336,16 @@ public class ChunkManager : MonoBehaviour
     */
     #endregion
 
+    //Helper functions include all functionality for the larger functions
     #region HelperFunctions
 
+    //Checks if a directory is empty
     public bool IsDirectoryEmpty(string path)
     {
         return !Directory.EnumerateFileSystemEntries(path).Any();
     }
 
+    //Reinitialises world objects and stores them in a static dictionary
     public void FindWorldObjects()
     {
         world_objects = new Dictionary<GameObject, ObjectTypes>();
@@ -342,6 +357,7 @@ public class ChunkManager : MonoBehaviour
         ExtractChildrenFromObject(ObjectTypes.ENTITY, we);
     }
 
+    //Function to relocate entity ownership to new chunks if they no longer reside in their orginal on deload
     private void RefreshEntities()
     {
         foreach (Chunk chunk in chunk_data.chunks)
@@ -363,6 +379,7 @@ public class ChunkManager : MonoBehaviour
         }
     }
 
+    //Basic object linkage
     private void LinkChildren()
     {
         foreach (Basic obj in chunk_data.pending_childs)
@@ -394,6 +411,7 @@ public class ChunkManager : MonoBehaviour
         return !(chunk_data.chunks == null);
     }
 
+    //Clears all oibjects from world 
     public void ClearAllObjects()
     {
         chunk_data.pending_childs = new List<Basic>();
@@ -406,6 +424,7 @@ public class ChunkManager : MonoBehaviour
         }
     }
 
+    //Generates the id's for each chunks neighbors by probing them with a detection radius 
     private void GenerateChunkNeighbours()
     {
         for (int i = 0; i < chunk_data.chunks.Count; i++)
@@ -439,6 +458,7 @@ public class ChunkManager : MonoBehaviour
         }
     }
 
+    //Updates the Chunk directories
     public void UpdateDirectories()
     {
         string world_data_directory = Application.dataPath + "/Resources/World Data";
@@ -474,6 +494,8 @@ public class ChunkManager : MonoBehaviour
             }
         }
     }
+
+    //Getters and Setters for a few different scenarios
 
     public static ChunkData GetChunks()
     {
@@ -520,10 +542,5 @@ public class ChunkManager : MonoBehaviour
         return world_objects;
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-
-    }
     #endregion
 }

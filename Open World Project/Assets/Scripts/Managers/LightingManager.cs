@@ -59,9 +59,10 @@ public class LightingManager : MonoBehaviour
             {
                 string json = JsonUtility.ToJson(lighting_presets);
                 File.WriteAllText(Application.dataPath + "/Resources/World Data/Lighting/Presets.json", json);
-
-                AssetDatabase.SaveAssets();
+#if UNITY_EDITOR
                 AssetDatabase.Refresh();
+                AssetDatabase.SaveAssets();
+#endif
             }
         }
     }

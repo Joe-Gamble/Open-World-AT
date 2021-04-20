@@ -126,19 +126,17 @@ public class Chunk
     }
 }
 
-
+//ChunkData struct
 [Serializable]
 public struct ChunkData
 {
-    public Bounds detection_bounds;
-
-    public Chunk current_chunk;
-    public float chunk_size;
-
-    public string directory;
     public List<Chunk> chunks;
-
     public List<Basic> pending_childs;
-
     public List<Basic> world_objects;
+
+    public Bounds detection_bounds;
+    public Chunk current_chunk;
+
+    public float chunk_size;
+    public string directory;
 }
