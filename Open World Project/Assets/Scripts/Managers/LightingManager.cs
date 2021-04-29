@@ -4,7 +4,6 @@ using UnityEngine;
 using System.IO;
 using UnityEditor;
 
-[ExecuteInEditMode]
 public class LightingManager : MonoBehaviour
 {
     LightingPresets lighting_presets;
@@ -21,9 +20,9 @@ public class LightingManager : MonoBehaviour
 
     public LightingPresets LoadPresets()
     {
-        if (Resources.Load("World Data/Lighting/Presets") != null)
+        if (File.Exists(Application.streamingAssetsPath + "/World Data/Lighting/Presets.json"))
         {
-            string path = File.ReadAllText(Application.dataPath + "/Resources/World Data/Lighting/Presets.json");
+            string path = File.ReadAllText(Application.streamingAssetsPath + "/World Data/Lighting/Presets.json");
             return JsonUtility.FromJson<LightingPresets>(path);
         }
         else
@@ -53,12 +52,12 @@ public class LightingManager : MonoBehaviour
     {
         lighting_presets = lps;
 
-        if (Directory.Exists(Application.dataPath + "/Resources/World Data/Lighting"))
+        if (Directory.Exists(Application.streamingAssetsPath + "/World Data/Lighting"))
         {
             if (lighting_presets.presets.Count > 0)
             {
                 string json = JsonUtility.ToJson(lighting_presets);
-                File.WriteAllText(Application.dataPath + "/Resources/World Data/Lighting/Presets.json", json);
+                File.WriteAllText(Application.streamingAssetsPath + "/World Data/Lighting/Presets.json", json);
 #if UNITY_EDITOR
                 AssetDatabase.Refresh();
                 AssetDatabase.SaveAssets();
@@ -73,11 +72,11 @@ public class LightingManager : MonoBehaviour
 
     public void LoadLightingPresets()
     {
-        if (Resources.Load("World Data/Lighting/Presets") != null)
+        if (Directory.Exists(Application.streamingAssetsPath + "/World Data/Lighting"))
         {
             lighting_presets = new LightingPresets();
 
-            string path = File.ReadAllText(Application.dataPath + "/Resources/World Data/Lighting/Presets.json");
+            string path = File.ReadAllText(Application.streamingAssetsPath + "/World Data/Lighting/Presets.json");
             lighting_presets = JsonUtility.FromJson<LightingPresets>(path);
 
             if (lighting_presets.current_preset.ambient_color == null)

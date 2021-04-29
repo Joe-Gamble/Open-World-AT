@@ -15,7 +15,7 @@ public class ChunkManager : MonoBehaviour
     public GameObject testPlane;
     private float length;
     //Divides desired e.g. 3 = 3x3 chunks
-    public int divides = 5;
+    public int divides = 4;
 
 
     //Runtime/EditorTime dictionary for accessing objects of custom type
@@ -26,12 +26,10 @@ public class ChunkManager : MonoBehaviour
     //Create a Chunk from Json Data
     public Chunk GetChunkFromFile(int chunk_id)
     {
-        string path = File.ReadAllText(Application.dataPath + "/Resources/World Data/Chunks/Chunk" + chunk_id + " Data.json");
+        string path = File.ReadAllText(Application.persistentDataPath + "/Resources/World Data/Chunks/Chunk" + chunk_id + " Data.json");
 
         Chunk chunk = new Chunk();
         chunk = JsonUtility.FromJson<Chunk>(path);
-
-        Debug.Log(chunk.chunk_ID);
 
         return chunk;
     }
@@ -116,7 +114,7 @@ public class ChunkManager : MonoBehaviour
 
         chunk_data.chunk_size = length / divides;
 
-        chunk_data.directory = "/Resources/World Data/Chunks/";
+        chunk_data.directory = "/World Data/Chunks/";
 
         Vector3 plane_pos = testPlane.transform.position;
 
@@ -185,7 +183,7 @@ public class ChunkManager : MonoBehaviour
     //Used to preview the world and load all saved data before adding additional changes
     public void LoadChunksFromDisk()
     {
-        string path = Application.dataPath + "/Resources/World Data/Chunks";
+        string path = Application.persistentDataPath + "/Resources/World Data/Chunks";
         if (!IsDirectoryEmpty(path))
         {
             ClearAllObjects();
@@ -213,7 +211,7 @@ public class ChunkManager : MonoBehaviour
     }
 
     //Saves all data for each chunk by overriting json files
-    public void SaveAllChunkData()
+    public static void SaveAllChunkData()
     {
         foreach (Chunk chunk in chunk_data.chunks)
         {
@@ -461,38 +459,44 @@ public class ChunkManager : MonoBehaviour
     //Updates the Chunk directories
     public void UpdateDirectories()
     {
-        string world_data_directory = Application.dataPath + "/Resources/World Data";
+#if UNITY_EDITOR
+        string resource_world_data = Application.persistentDataPath + "/Resources/World Data";
 
-        if (Directory.Exists(world_data_directory))
+        if (Directory.Exists(resource_world_data + "/Chunks"))
         {
-            FileUtil.DeleteFileOrDirectory(world_data_directory + "/Chunks");
-
-            if (!Directory.Exists(world_data_directory + "/Materials"))
-            {
-                Directory.CreateDirectory(world_data_directory + "/Materials");
-            }
-
-            if (!Directory.Exists(world_data_directory + "/Meshes"))
-            {
-                Directory.CreateDirectory(world_data_directory + "/Meshes");
-            }
-            AssetDatabase.Refresh();
+            FileUtil.DeleteFileOrDirectory(resource_world_data + "/Chunks");
+            Directory.CreateDirectory(resource_world_data + "/Chunks");
         }
         else
         {
-            Directory.CreateDirectory(world_data_directory);
-            Directory.CreateDirectory(world_data_directory + "/Chunks");
+            Directory.CreateDirectory(resource_world_data + "/Chunks");
+        }
 
-            if (!Directory.Exists(world_data_directory + "/Materials"))
+        if (!Directory.Exists(resource_world_data + "/Materials"))
+        {
+            Directory.CreateDirectory(resource_world_data + "/Materials");
+        }
+        else
+        {
+            if (!Directory.Exists(resource_world_data + "/Materials"))
             {
-                Directory.CreateDirectory(world_data_directory + "/Materials");
-            }
-
-            if (!Directory.Exists(world_data_directory + "/Meshes"))
-            {
-                Directory.CreateDirectory(world_data_directory + "/Meshes");
+                Directory.CreateDirectory(resource_world_data + "/Materials");
             }
         }
+
+        if (!Directory.Exists(resource_world_data + "/Meshes"))
+        {
+            Directory.CreateDirectory(resource_world_data + "/Meshes");
+        }
+        else
+        {
+            if (!Directory.Exists(resource_world_data + "/Meshes"))
+            {
+                Directory.CreateDirectory(resource_world_data + "/Meshes");
+            }
+        }
+        AssetDatabase.Refresh();
+#endif
     }
 
     //Getters and Setters for a few different scenarios

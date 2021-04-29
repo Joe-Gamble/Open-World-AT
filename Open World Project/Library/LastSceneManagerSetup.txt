@@ -1,5 +1,6 @@
 sceneSetups:
-- path: Assets/Scenes/SampleScene.unity
+- path: D:/Joes stuff/UWE Games Tech/Coursework/Year 3/AT/Open World/Project/Open
+    World Game/Open World Project/Assets/Scenes/SampleScene.unity
   isLoaded: 1
   isActive: 1
   isSubScene: 0

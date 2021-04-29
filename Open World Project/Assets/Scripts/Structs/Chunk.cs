@@ -42,7 +42,6 @@ public class Chunk
 
         foreach (Basic basic in basic_objects)
         {
-            Debug.Log(basic.transform_data.name);
             WorldManager.DeleteObject(basic.transform_data);
         }
 
@@ -58,17 +57,21 @@ public class Chunk
     {
         foreach (KeyValuePair<GameObject, ObjectTypes> wo in world_objects)
         {
-            if (chunk_bounds.Contains(wo.Key.transform.position))
+            if (wo.Value != ObjectTypes.ENTITY)
             {
-                if (!ChunksHaveObject(wo.Key))
+                if (chunk_bounds.Contains(wo.Key.transform.position))
                 {
-                    InitialseObj(wo.Value, wo.Key);
-                }
-                else
-                {
-                    continue;
+                    if (!ChunksHaveObject(wo.Key))
+                    {
+                        InitialseObj(wo.Value, wo.Key);
+                    }
+                    else
+                    {
+                        continue;
+                    }
                 }
             }
+
         }
     }
 
@@ -91,7 +94,7 @@ public class Chunk
 
     public void OverrideData()
     {
-        string path = Application.dataPath + "/Resources/World Data/Chunks/Chunk" + chunk_ID + " Data.json";
+        string path = Application.persistentDataPath + "/Resources/World Data/Chunks/Chunk" + chunk_ID + " Data.json";
 
         string json = JsonUtility.ToJson(this);
 

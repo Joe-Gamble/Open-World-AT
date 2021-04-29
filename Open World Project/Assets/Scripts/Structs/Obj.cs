@@ -25,6 +25,8 @@ public class TransformData
         parent = -1;
         children = null;
 
+        runtime_ref = go;
+
         position = trans.position;
         rotation = trans.rotation;
         scale = trans.localScale;
@@ -108,6 +110,7 @@ public static class ObjManager
     }
 }
 
+[Serializable]
 public class Basic
 {
     public Basic(Chunk chunk, GameObject go, bool recursive)
@@ -152,6 +155,8 @@ public class Basic
     public List<string> obj_mats;
     public string collider_type;
 
+#if UNITY_EDITOR
+
     public void SaveObjectData(GameObject go)
     {
         if (go.TryGetComponent(out Renderer r))
@@ -185,7 +190,6 @@ public class Basic
                 if (Resources.Load("World Data/Meshes/" + obj_mesh) == null)
                 {
                     string status = AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(sm), m_path + "Meshes/" + obj_mesh + ".fbx");
-
                     if (status != "")
                     {
                         // print(status);
@@ -232,7 +236,6 @@ public class Basic
                     }
                 }
             }
-
             if (go.TryGetComponent(out Collider col))
             {
                 collider_type = col.GetType().ToString();
@@ -242,6 +245,7 @@ public class Basic
             AssetDatabase.SaveAssets();
         }
     }
+#endif
 
 
     private void SaveMats(string m_path, Material[] mats)
@@ -254,7 +258,9 @@ public class Basic
 
                 if (Resources.Load("World Data/Materials/" + mat) == null)
                 {
+#if UNITY_EDITOR
                     string status = AssetDatabase.MoveAsset(AssetDatabase.GetAssetPath(mat), m_path + "Materials/" + mat.name + ".mat");
+#endif
                     //Debug.Log(status);
                 }
             }
@@ -264,7 +270,9 @@ public class Basic
 
     public void Initialise(GameObject go)
     {
+#if UNITY_EDITOR
         SaveObjectData(go);
+#endif
     }
 
     public void Spawn()

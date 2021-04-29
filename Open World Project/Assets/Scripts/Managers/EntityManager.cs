@@ -78,7 +78,7 @@ public class Entity
                 NavMeshAgent agent = entity_go.AddComponent<NavMeshAgent>();
                 agent.speed = 1;
 
-                //entity_go.AddComponent<EntityMovement>();
+                entity_go.AddComponent<EntityMovement>();
             }
         }
     }
@@ -192,7 +192,7 @@ public struct EntityCollection
 public class EntityManager
 {
     public static EntityCollection collection;
-    static string path = Application.dataPath + "/Resources/World Data/Entities/EntityData.json";
+    static string path = Application.streamingAssetsPath + "/World Data/Entities/EntityData.json";
     //"
 
     public static EntityCollection GetCollection()
